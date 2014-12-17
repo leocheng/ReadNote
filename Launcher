@@ -1,0 +1,1098 @@
+目录：
+    1、MiniApp       通过 PopupWindow 实现，解析xml中的布局文件，确定显示位置即可，交互是通过AIDL和广播
+    2、未读数量      实现原理：通过ContentObserver监听数据库的变化，通过回调更新界面
+    3、动态App       实现原理：时钟通过Timer实现，日历通过广播实现
+    4、Drag实现      实现原理：在DragLayer中拦截触摸事件，计算当前位置，并更新需要移动的icon的位置
+    5、Folder的生成、删除、增加icon、移动
+    6、Launcher3壁纸
+    7、DrawerLayout改装
+    8、print_db.py和fill_screens.py作用
+    9、Android.mk文件介绍
+    10、JrdLauncher Widget
+    11、Launcher加载过程
+    12、Launcher widget添加流程
+
+==========================================
+基本配置
+    控制资源分离：
+        MTK: pixo8_3g/device/jrdcom/pixo8_3g/jrd_product_constant.mk
+        QCOM: pop8_lte_global/device/tct/pop8lte/perso/string_res.ini
+
+    翻译：（MTK翻译依赖于资源分离,QCOM翻译与资源分离无关）
+        MTK： pixo8_3g/device/jrdcom/pixo8_3g/string_res.ini
+        QCOM: pop8_lte_global/device/tct/pop8lte/perso/string_res.ini
+        
+    系统全局属性配置：
+        MTK: pixo8_3g/soul45_wimdata_ng/wprocedures/pixo8_3g/isdm_sys_properties.plf
+        QCOM: pop8_lte_global/device/tct/pop8lte/perso/isdm_sys_properties.plf
+
+    
+==========================================
+1、MiniApp
+    实现原理：通过 PopupWindow 实现，解析xml中的布局文件，确定显示位置即可，交互是通过AIDL和广播
+    代码：pop8s_global_jrdLauncher
+        mini App 布局：所有布局都在由以下xml文件中，通过解析XML文档来获取来获取所有布局
+        ./res/xml/mini_app_list.xml
+    加载布局
+        ./src/com/jrdcom/launcher/MiniAppLoader.java:117:            parser = res.getXml(R.xml.mini_app_list);
+        // 解析上述mini_app_list.xml文件
+        ./src/com/jrdcom/launcher/Launcher.java:1027:        MiniAppLoader.loadMiniAppList(this);
+        // 如果当前状态处于miniApp状态则退出该状态
+        ./src/com/jrdcom/launcher/Launcher.java:9572:            MiniAppLoader.getInstance().exitMiniApp(animated);
+    触摸事件拦截处理：
+    CellLayout.onTouchEvent() --> interceptMiniApp()    
+    private boolean interceptMiniApp(MotionEvent ev) {
+        ...
+        if (mMiniShortcut != null) {
+            ShortcutInfo info = (ShortcutInfo) mMiniShortcut.getTag();
+            if (info != null && info.hasMiniApp()
+                    && ev.getAction() == MotionEvent.ACTION_UP) {
+                final int activePointerId = mActivePointerId;
+                final int pointerIndex = ev.findPointerIndex(activePointerId);
+                final float pointerY = ev.getY(pointerIndex);
+                final VelocityTracker velocityTracker = mVelocityTracker;
+                velocityTracker.computeCurrentVelocity(1000, mMaximumVelocity);
+                int velocityY = (int) velocityTracker.getYVelocity(activePointerId);
+
+                float totalMotionY = mLastMotionYflying + mLastMotionYRemainder - pointerY;
+                mTotalMotionY = Math.abs(totalMotionY);
+                boolean isYFling = mTotalMotionY > mMinFlingLength && Math.abs(velocityY) > mMinFlingVelocity;
+                if (isYFling) {
+                // 传递Launcher，shortcut信息，目标位置
+                    MiniAppLoader.getInstance().showMiniApp(launcher, info, mMiniShortcut,totalMotionY < 0);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    MiniAppLoader.getInstance().showMiniApp(launcher, info, mMiniShortcut,totalMotionY < 0);
+    public void showMiniApp(final Launcher launcher, ShortcutInfo miniAppInfo,
+            JrdShortcut rootView, boolean isAnimatedDown) {
+        mContext = launcher;
+        // shortcur信息
+        MiniAppInfo info = getMiniAppInfo(miniAppInfo.getCmpName());
+        mShortcut = rootView;
+        // 解析layout布局
+        View view = LayoutInflater.from(launcher).inflate(info.getLayoutId(), null);
+        launcher.getDragLayer().getLocationInDragLayer(mShortcut.mFavorite, mTempXY);
+        mMiniApp = MiniApp.fromXml(launcher, view, width, sMiniWidth, miniAppHeight, mShortcut.mFavorite, mTempXY, isAnimatedDown, mInHotseat);
+        mMiniApp.setOnClickListener(this);
+        // 生成popwindow并显示
+        mPopupWindow = new PopupWindow(mMiniApp, width, height);
+        mPopupWindow.showAtLocation(rootView, Gravity.NO_GRAVITY, 0, locationY);
+        animateOpen(locationY);
+        launcher.setState(launcher.getState().MINI_APP);
+    }
+    
+    交互：主要通过AIDL和广播
+        ./res/layout/jrd_music_layout.xml
+        ./res/xml/mini_app_list.xml:16:        launcher:layoutId="@layout/jrd_music_layout"
+    MusicView
+        // AIDL交互
+        onFinishInflate() {
+            // 通过AIDL绑定Service
+            mContext.bindService(new Intent(ANDROID_MUSIC_SERVICE), mMusicServiceConnection, Context.BIND_AUTO_CREATE)
+        }
+        
+        private ServiceConnection mMusicServiceConnection = new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName name, android.os.IBinder service) {
+                mJrdMusicService = com.android.music.IMediaPlaybackService.Stub.asInterface(service);
+                update(MusicAsyncTask.GET_DATA);
+            }
+
+            @Override
+            public void onServiceDisconnected(ComponentName name) {
+                mJrdMusicService = null;
+            }
+        };
+        // 广播交互
+        private BroadcastReceiver mReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+                if (action.equals(ACTION_META_CHANGED)
+                        || action.equals(ACTION_PLAYSTATE_CHANGED)
+                        || action.equals(ACTION_HEADSET_PLUG_ACTION)) {
+                    update(MusicAsyncTask.GET_DATA);
+                }
+            }
+        };
+    为什么要通过加载xml来解析加载所有布局？
+        解析xml，将所有的MiniApp信息添加到一个ArrayList中，便于统一管理，比如说，查找某个MiniApp是否存在。
+        
+==========================================
+2、未读数量
+    实现原理：通过ContentObserver监听数据库的变化，通过回调更新界面
+    显示右上角图标：
+        workspace: JrdShortcut:    mUnread = (TextView)findViewById(R.id.app_unread);
+        allapps: JrdAppIcon:     mUnread = (TextView)findViewById(R.id.app_customize_unread);
+        
+    LauncherApplication：    
+        public void onCreate() {
+            mUnreadLoader = new JrdUnreadLoader(getApplicationContext());
+            mUnreadLoader.registerContentObserver();
+            
+            mUnreadLoader.initialize(launcher);
+        }
+    public void registerContentObserver() {
+        mContext.getContentResolver().registerContentObserver(
+                Telephony.MmsSms.CONTENT_URI, true, mMissedSmsContentObserver);
+        mContext.getContentResolver().registerContentObserver(
+                Uri.parse("content://call_log"), true,
+                mMissedCallContentObserver);
+        mContext.getContentResolver().registerContentObserver(
+                CalendarAlerts.CONTENT_URI, true,
+                mMissedCalenderContentObserver);
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(ACTION_UNREAD_CHANGED);
+        mContext.registerReceiver(mUnreadReceiver,filter);
+        mContext.registerReceiver(mUpdateUnreadReceiver, filter); //[BUGFIX]-Add by TCTNB.Hongjuan.Hou,02/10/2014,FR568301,592044,Guest mode
+    }
+    private class MissedSmsContentObserver extends ContentObserver{
+        @Override
+        public void onChange(boolean selfChange) {
+            super.onChange(selfChange);
+            if (mHandler!=null) {
+                Message msg = Message.obtain();
+                msg.what=UPDATE_SMS;
+                mHandler.sendMessageDelayed(msg, 1000);
+            }
+        }
+    }
+    
+    public void receiveNotification(ComponentName componentName, int unreadNum) {
+        if (mCallbacks != null && componentName != null && unreadNum != -1) {
+            final int index = supportUnreadFeature(componentName);
+            final ContentResolver cr = mContext.getContentResolver();
+            if (index >= 0) {
+                if (!mUneadNumHashMap.get(componentName).equals(unreadNum)) {
+                    if(isGuestMode) unreadNum = 0;
+                    setUnreadNumberAt(index, unreadNum);
+                    mUneadNumHashMap.put(componentName, unreadNum);
+                    final UnreadCallbacks callbacks = mCallbacks.get();
+                    final UnreadSupportShortcut shortcut = sUnreadSupportShortcuts.get(index);
+                    Settings.System.putInt(cr, shortcut.key, unreadNum);
+                    if (callbacks != null) {
+                    // 通过回调更新界面
+                        callbacks.bindComponentUnreadChanged(componentName, unreadNum);
+                    }
+                }
+            }
+        }
+    }
+    public void bindComponentUnreadChanged(final ComponentName component, final int unreadNum) {
+        // Post to message queue to avoid possible ANR.
+        mHandler.post(new Runnable() {
+            public void run() {
+                if (mWorkspace != null) {
+                    mWorkspace.updateComponentUnreadChanged(component, unreadNum);
+                }
+                if (mAppsCustomizeContent != null) {
+                    mAppsCustomizeContent.updateAppsUnreadChanged(component, unreadNum);
+                }
+            }
+        });
+    }
+
+    public void updateComponentUnreadChanged(ComponentName component, int unreadNum) {
+        ArrayList<ShortcutAndWidgetContainer> childrenLayouts = getAllShortcutAndWidgetContainers();
+        for (ShortcutAndWidgetContainer layout : childrenLayouts) {
+            int childCount = layout.getChildCount();
+            for (int j = 0; j < childCount; j++) {
+                final View view = layout.getChildAt(j);
+                final Object tag = view.getTag();
+                if (tag instanceof ShortcutInfo) {
+                    ShortcutInfo info = (ShortcutInfo) tag;
+                    final Intent intent = info.intent;
+                    final ComponentName componentName = intent.getComponent();
+                    if (componentName != null && componentName.equals(component)) {
+                        // 更新未读数量
+                        ((JrdShortcut) view).updateShortcutUnreadNum(unreadNum);
+                    }
+                } else if (tag instanceof FolderInfo) {
+                    ((FolderIcon) view).updateFolderUnreadNum(component, unreadNum);
+                }
+            }
+        }
+    }
+==========================================
+3、动态App（时钟、日历的实时更新）
+广播
+    实现原理：时钟通过Timer实现，日历通过广播实现
+    补充：
+        java.util.Timer定时器，实际上是个线程，定时调度所拥有的TimerTasks。
+        一个TimerTask实际上就是一个拥有run方法的类，需要定时执行的代码放到run方法体内，TimerTask一般是以匿名类的方式创建。 
+    ./src/com/jrdcom/launcher/DynamicIconHelper.java:525：   secondImage = decodeResource(R.drawable.ic_time_second, false);
+    public void onResume() {
+        sheduleTimer();
+        
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(Intent.ACTION_DATE_CHANGED);
+        filter.addAction(Intent.ACTION_TIME_TICK);
+        filter.addAction(Intent.ACTION_TIME_CHANGED);
+        filter.addAction(Intent.ACTION_TIMEZONE_CHANGED);
+        mLauncher.registerReceiver(mReceiver, filter);
+    }
+    public void sheduleTimer() {
+        mTimer = new Timer();
+        mTimer.schedule(new TimerTask() {
+            public void run() {
+                mHandler.removeMessages(UPDATE_TIME);
+                Message message = new Message();
+                message.what = UPDATE_TIME;
+                mHandler.sendMessage(message);
+            }
+        }, 0, 1000);
+    }
+    public void updateTimeIcon() {
+        mLauncher.runOnUiThread(new Runnable(){
+            public void run() {
+                // 获取新的Bitmap
+                Bitmap bm = getTimeBitmap();
+                // 更新桌面
+                for(BubbleTextView btv : timeShorcutList) {
+                    btv.updateBitmap(bm);
+                }
+                for(PagedViewIcon icon : timeAppIconList)
+                    icon.updateBitmap(bm);
+            }
+        });
+    }
+
+==========================================
+4、LauncherDrag事件
+
+    AllApps: AppsCustomizePagedView --> PagedViewWithDraggableItems --> PagedView
+    Workspace: Workspace --> SmoothPagedView --> PagedView
+    Widget:WidgetsCustomizePagedView --> PagedViewWithDraggableItems --> PagedView
+    JrdLolder: JrdCustomizePagedView --> SmoothPagedView --> PagedView
+    
+    PagedViewWithDraggableItems implements View.OnLongClickListener 
+    WidgetCellLayout implements View.OnLongClickListener 
+    
+    Launcher -->
+        public boolean onLongClick(View v) {
+            // 1) 获取CellLayout上一个被拖动的对象
+            CellLayout.CellInfo longClickCellInfo = (CellLayout.CellInfo) v.getTag();
+            if (itemUnderLongClick == null) {
+                // 进入widget选择界面
+                showWidgetAddEdit(true);
+            } else {
+                // 开始拖动ShortCut、Widget、FolderIcon
+                if (itemUnderLongClick instanceof JrdShortcut){
+                    mWorkspace.startDrag(longClickCellInfo);
+                    return true;
+                } else if(itemUnderLongClick instanceof AppWidgetHostView) {
+                    mWorkspace.startDrag(longClickCellInfo);
+                    return true;
+                } else if(itemUnderLongClick instanceof FolderIcon) {
+                    ...
+                    mWorkspace.startDrag(longClickCellInfo);
+                    return true;
+                }
+            }
+        }
+    上述v.getTag()的内容是在CellLayout的onInterceptTouchEvent(ev)中设置的
+    public boolean onInterceptTouchEvent(MotionEvent ev) {
+        ...
+        if (action == MotionEvent.ACTION_DOWN) {
+            ...
+            // 当触摸的view处于所在的触摸区域时，设置cellInfo
+            if (frame.contains(x, y)) {
+                cellInfo.cell = child;
+                cellInfo.cellX = lp.cellX;
+                cellInfo.cellY = lp.cellY;
+                cellInfo.spanX = lp.cellHSpan;
+                cellInfo.spanY = lp.cellVSpan;
+                found = true;
+                break;
+            }
+            if (!found) {
+                final int cellXY[] = mTmpXY;
+                pointToCellExact(x, y, cellXY);
+                cellInfo.cell = null;
+                cellInfo.cellX = cellXY[0];
+                cellInfo.cellY = cellXY[1];
+                cellInfo.spanX = 1;
+                cellInfo.spanY = 1;
+            }
+        // 设置Tag(cellInfo)
+        setTag(cellInfo);
+        }
+    }
+    Workspace --> startDrag()
+        void startDrag(CellLayout.CellInfo cellInfo) {
+        View child = cellInfo.cell;
+        // 判断点击的icon是否未空
+        if (child != null && child.getTag() == null) {
+            return;
+        }
+        // 隐藏原先的图标
+        mDragInfo = cellInfo;
+        child.setVisibility(INVISIBLE);
+        
+        mDragOutline = createDragOutline(child, canvas, DRAG_BITMAP_PADDING);
+        beginDragShared(child, this);
+    }
+    上述child.getTag()是在Launcher的onCreateShortCur()中设置的
+        View createShortcut(int layoutResId, ViewGroup parent, ShortcutInfo info) {
+            BubbleTextView favorite = (BubbleTextView) mInflater.inflate(layoutResId, parent, false);
+            favorite.applyFromShortcutInfo(info, mIconCache);
+            favorite.setOnClickListener(this);//设置点击事件
+            return favorite;
+        }
+        public void applyFromShortcutInfo(ShortcutInfo info, IconCache iconCache) {
+            Bitmap b = info.getIcon(iconCache);
+            LauncherAppState app = LauncherAppState.getInstance();
+            DeviceProfile grid = app.getDynamicGrid().getDeviceProfile();
+            setCompoundDrawables(null, Utilities.createIconDrawable(b), null, null);
+            setCompoundDrawablePadding((int) ((grid.folderIconSizePx - grid.iconSizePx) / 2f));
+            setText(info.title);
+            setTag(info);// 设置Tag信息
+        }
+    在Workspace.beginDragShared()中调用DragConoller()的startDrag()
+    public void beginDragShared(View child, DragSource source) {
+        // 创建被拖动时的Bitmap
+        final Bitmap b = createDragBitmap(child, new Canvas(), DRAG_BITMAP_PADDING);
+        ...
+        mDragController.startDrag(b, dragLayerX, dragLayerY, source, child.getTag(),
+                DragController.DRAG_ACTION_MOVE, dragVisualizeOffset, dragRect, scale);
+
+    }
+    
+    DragController --> startDrag()
+        public void startDrag(Bitmap b, int dragLayerX, int dragLayerY,
+            DragSource source, Object dragInfo, int dragAction, Point dragOffset, Rect dragRegion,
+            float initialDragViewScale) {
+            
+            // 1) 启动各个观察者
+            for (DragListener listener : mListeners) {
+                listener.onDragStart(source, dragInfo, dragAction);
+            }
+            // 记录当前的状态
+            mDragging = true;
+            
+            // 2) 创建DragView对象
+            final DragView dragView = mDragObject.dragView = new DragView(mLauncher, b, registrationX,
+                registrationY, 0, 0, b.getWidth(), b.getHeight(), initialDragViewScale);
+            ...
+            // 3) 显示DragView对象(将该DragView添加到DragLayer上)
+            dragView.show(mMotionDownX, mMotionDownY); --> DragView.show(){mDragLayer.addView(this)}
+            // 4) 根据当前的位置处理移动事件
+            handleMoveEvent(mMotionDownX, mMotionDownY);
+        }
+        
+    private void handleMoveEvent(int x, int y) {
+        // 1) 移动View，DragView继承至View，在方法move（）中设置setTranslationX（）、setTranslationY（）即可移动view
+        mDragObject.dragView.move(x, y);
+
+        // 2）查找移动目标
+        DropTarget dropTarget = findDropTarget(x, y, coordinates);
+        // 3）
+        checkTouchMove(dropTarget);
+        ...
+        checkScrollState(x, y);
+    }
+        
+        上述DragView的创建过程：长安一个ShortCut后，对应图标放大的动画过程，并且跳动到手指的位置，所以创建过程主要是记录一些参数，准备浩动画
+    public DragView(Launcher launcher, Bitmap bitmap, int registrationX, int registrationY,
+            int left, int top, int width, int height, final float initialScale) {
+        super(launcher);
+        mDragLayer = launcher.getDragLayer();
+        mInitialScale = initialScale;
+
+        final Resources res = getResources();
+        final float offsetX = res.getDimensionPixelSize(R.dimen.dragViewOffsetX);
+        final float offsetY = res.getDimensionPixelSize(R.dimen.dragViewOffsetY);
+        final float scaleDps = res.getDimensionPixelSize(R.dimen.dragViewScale);
+        final float scale = (width + scaleDps) / width;
+
+        // Set the initial scale to avoid any jumps
+        setScaleX(initialScale);
+        setScaleY(initialScale);
+
+        // Animate the view into the correct position
+        mAnim = LauncherAnimUtils.ofFloat(this, 0f, 1f);
+        mAnim.setDuration(150);
+        mAnim.addUpdateListener(new AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                ...
+            }
+        });
+
+        mBitmap = Bitmap.createBitmap(bitmap, left, top, width, height);
+        setDragRegion(new Rect(0, 0, width, height));
+
+        // The point in our scaled bitmap that the touch events are located
+        mRegistrationX = registrationX;
+        mRegistrationY = registrationY;
+
+        // Force a measure, because Workspace uses getMeasuredHeight() before the layout pass
+        int ms = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        measure(ms, ms);
+        mPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
+    }
+    public void show(int touchX, int touchY) {
+        mDragLayer.addView(this);
+        ...
+        setLayoutParams(lp);
+        // 设置显示位置
+        setTranslationX(touchX - mRegistrationX);
+        setTranslationY(touchY - mRegistrationY);
+
+        // 播放动画
+        post(new Runnable() {
+                public void run() {
+                    mAnim.start();
+                }
+            });
+    }
+    至此长按一个图标到到开始拖动已经准备好，详细的拖动过程需要从DragController.onInterceptTouchEvent（）说起
+    DragLayer是Launcher所有布局的父容器，它的onInterceptTouchEvent()已交由DragController.onInterceptTouchEvent()来处理，
+    public boolean onInterceptTouchEvent(MotionEvent ev) {
+        final int action = ev.getAction();
+        final int[] dragLayerPos = getClampedDragLayerPos(ev.getX(), ev.getY());
+        final int dragLayerX = dragLayerPos[0];
+        final int dragLayerY = dragLayerPos[1];
+        switch (action) {
+            case MotionEvent.ACTION_MOVE:
+                break;
+            case MotionEvent.ACTION_DOWN:
+                // Remember location of down touch
+                mMotionDownX = dragLayerX;
+                mMotionDownY = dragLayerY;
+                mLastDropTarget = null;
+                break;
+            case MotionEvent.ACTION_UP:
+                mLastTouchUpTime = System.currentTimeMillis();
+                if (mDragging) {
+                    PointF vec = isFlingingToDelete(mDragObject.dragSource);
+                    if (!DeleteDropTarget.willAcceptDrop(mDragObject.dragInfo)) {
+                        vec = null;
+                    }
+                    if (vec != null) {
+                        dropOnFlingToDeleteTarget(dragLayerX, dragLayerY, vec);
+                    } else {
+                        drop(dragLayerX, dragLayerY);
+                    }
+                }
+                endDrag();
+                break;
+            case MotionEvent.ACTION_CANCEL:
+                cancelDrag();
+                break;
+        }
+        return mDragging;
+    }
+    在startDrag中已经将mDragging设未true，所以move状态下，DragLayer是touch事件进行了拦截，DragContrlller.onTouchEvent()中的做统一处理
+    public boolean onTouchEvent(MotionEvent ev) {
+        final int action = ev.getAction();
+        final int[] dragLayerPos = getClampedDragLayerPos(ev.getX(), ev.getY());
+        final int dragLayerX = dragLayerPos[0];
+        final int dragLayerY = dragLayerPos[1];
+        switch (action) {
+        case MotionEvent.ACTION_DOWN:
+            // Remember where the motion event started
+            mMotionDownX = dragLayerX;
+            mMotionDownY = dragLayerY;
+            if ((dragLayerX < mScrollZone) || (dragLayerX > mScrollView.getWidth() - mScrollZone)) {
+                mScrollState = SCROLL_WAITING_IN_ZONE;
+                mHandler.postDelayed(mScrollRunnable, SCROLL_DELAY);
+            } else {
+                mScrollState = SCROLL_OUTSIDE_ZONE;
+            }
+            handleMoveEvent(dragLayerX, dragLayerY);
+            break;
+        case MotionEvent.ACTION_MOVE:
+            handleMoveEvent(dragLayerX, dragLayerY);
+            break;
+        case MotionEvent.ACTION_UP:
+            // Ensure that we've processed a move event at the current pointer location.
+            handleMoveEvent(dragLayerX, dragLayerY);
+            mHandler.removeCallbacks(mScrollRunnable);
+
+            if (mDragging) {
+             // 判断是否到达可删除的区域
+                PointF vec = isFlingingToDelete(mDragObject.dragSource);
+                if (!DeleteDropTarget.willAcceptDrop(mDragObject.dragInfo)) {
+                    vec = null;
+                }
+                if (vec != null) {
+                 // 拖动到垃圾箱中进行删除
+                    dropOnFlingToDeleteTarget(dragLayerX, dragLayerY, vec);
+                } else {
+                    drop(dragLayerX, dragLayerY);
+                }
+            }
+            // 拖放结束
+            endDrag();
+            break;
+        case MotionEvent.ACTION_CANCEL:
+            mHandler.removeCallbacks(mScrollRunnable);
+            cancelDrag();
+            break;
+        }
+        return true;
+    }
+    
+    // 拖放结束
+    private void drop(float x, float y) {
+        final int[] coordinates = mCoordinatesTemp;
+        // x,y所在区域是否有合适的目标
+        final DropTarget dropTarget = findDropTarget((int) x, (int) y, coordinates);
+
+        boolean accepted = false;
+        if (dropTarget != null) {
+            mDragObject.dragComplete = true;
+            dropTarget.onDragExit(mDragObject);
+            if (dropTarget.acceptDrop(mDragObject)) {
+                dropTarget.onDrop(mDragObject);
+                accepted = true;
+            }
+        }
+        mDragObject.dragSource.onDropCompleted((View) dropTarget, mDragObject, false, accepted);
+    }
+    
+    private void endDrag() {
+        if (mDragging) {
+            // 回复拖放状态值
+            mDragging = false;
+            clearScrollRunnable();
+            ...
+                    mDragObject.dragView.remove();
+            ...
+            for (DragListener listener : mListeners) {
+                listener.onDragEnd();
+            }
+        }
+        releaseVelocityTracker();
+    }
+    // 更新界面，更新数据库
+        Workspace.acceptDrop()
+            --> CellLayout.createArea()
+                --> CellLayout.commitTempPlacement()
+                    --> Workspace.updateItemLocationsInDatabase(this);
+        
+==========================================
+5、Folder的生成、删除、增加icon、移动
+    
+    
+移动:
+    DragController.onTouchEvent().handleMoveEvent()
+    
+    图片：portal_ring_outer_holo
+./src/com/android/launcher3/FolderIcon.java:199:        public static Drawable sSharedOuterRingDrawable = null;
+./src/com/android/launcher3/FolderIcon.java:223:                sSharedOuterRingDrawable = res.getDrawable(R.drawable.portal_ring_outer_holo);
+./src/com/android/launcher3/CellLayout.java:473:                    d = FolderRingAnimator.sSharedOuterRingDrawable;
+    
+
+Workspace -- initWorkspace()
+        mMaxDistanceForFolderCreation = (0.55f * grid.iconSizePx);
+        
+Workspace -- willCreateUserFolder()
+        
+        
+        
+        
+
+==========================================
+6、Launcher3壁纸
+
+==========================================
+7、DrawerLayout改装
+    1）onMeasure() -- 待改
+    2）findDrawerWithGravity -- 待改
+    3）onLayout()
+    4) drawChild()
+    5) onInterceptTouchEvent()
+    6) onTouchEvent()
+    
+==========================================
+8、print_db.py和fill_screens.py作用
+    不是必须的，主要是为了导出数据库文件，对其进行修改，再导入文件，它们为手机厂家或开发者定制屏幕图标提供了方便
+    print_db.py用于在当前路径下创建db_files目录，然后将/data/data/com.android.launcher/databases/launcher.db数据库pull出来后，将其里面的数据取出，生成一个html文件:index.html
+    fill_screens.py会从手机上pull出launcher.db数据库文件对其修改后，再push进手机中（若python版本不对，需如同print_db.py进行修改）。
+
+==========================================
+9、Android.mk文件介绍
+    ---- POP10 Launcher3
+### Android.mk中 可以 定义 多个编译模块，每个编译模块 都是 以include $(CLEAR_VARS)开始以include $(BUILD_XXX)结束。
+### 表示当前文件的路径 必须定义在最开始
+LOCAL_PATH := $(call my-dir)
+############## 模块 1 ##################
+include $(CLEAR_VARS)  ######清除除LOCAL_PATH以外的所有LOCAL_XXX变量
+    LOCAL_MODULE_TAGS := optional    ######在哪个版本下编译（user eng tests optional），默认optional在所有版本下编译
+    LOCAL_STATIC_JAVA_LIBRARIES := android-support-v13
+    LOCAL_SRC_FILES := $(call all-java-files-under, src) \    ######LOCAL_SRC_FILES表示app的所有源码
+        $(call all-java-files-under, WallpaperPicker/src) \
+        $(call all-renderscript-files-under, src) \
+        $(call all-proto-files-under, protos)
+    LOCAL_RESOURCE_DIR := $(LOCAL_PATH)/WallpaperPicker/res $(LOCAL_PATH)/res
+    LOCAL_AAPT_FLAGS := --auto-add-overlay
+    LOCAL_PROTOC_OPTIMIZE_TYPE := nano
+    LOCAL_PROTOC_FLAGS := --proto_path=$(LOCAL_PATH)/protos/
+    LOCAL_SDK_VERSION := 21
+    LOCAL_PACKAGE_NAME := Launcher3    ######应用程序名称
+    LOCAL_CERTIFICATE := platform      ######指定使用的哪种key来给apk签名，platform 就是 指 用 platform.pk8和platform.x509.pem两个文件来签名。
+                                       ######用这两个key签名后apk才真正可以放入系统进程中
+    LOCAL_OVERRIDES_PACKAGES := Launcher2
+    LOCAL_PROGUARD_FLAG_FILES := proguard.flags
+include $(BUILD_PACKAGE)
+include $(call all-makefiles-under,$(LOCAL_PATH))
+
+#
+# Protocol Buffer Debug Utility in Java
+#
+############## 模块 2 ##################
+include $(CLEAR_VARS)
+    LOCAL_SRC_FILES := $(call all-java-files-under, util) \
+        $(call all-proto-files-under, protos)
+    LOCAL_PROTOC_OPTIMIZE_TYPE := nano
+    LOCAL_PROTOC_FLAGS := --proto_path=$(LOCAL_PATH)/protos/
+    LOCAL_MODULE_TAGS := optional
+    LOCAL_MODULE := launcher_protoutil_lib    ######生成的模块的名称，当编译动态库或者静态库时，此变量表示库名称
+    LOCAL_IS_HOST_MODULE := true
+    LOCAL_JAR_MANIFEST := util/etc/manifest.txt
+    LOCAL_STATIC_JAVA_LIBRARIES := host-libprotobuf-java-2.3.0-nano
+include $(BUILD_HOST_JAVA_LIBRARY)
+
+#
+# Protocol Buffer Debug Utility Wrapper Script
+#
+############## 模块 3 ##################
+include $(CLEAR_VARS)
+    LOCAL_IS_HOST_MODULE := true
+    LOCAL_MODULE_CLASS := EXECUTABLES
+    LOCAL_MODULE_TAGS := optional
+    LOCAL_MODULE := launcher_protoutil
+include $(BUILD_SYSTEM)/base_rules.mk
+
+$(LOCAL_BUILT_MODULE): launcher_protoutil_lib
+$(LOCAL_BUILT_MODULE): $(LOCAL_PATH)/util/etc/launcher_protoutil | $(ACP)
+	@echo "Copy: $(PRIVATE_MODULE) ($@)"
+	$(copy-file-to-new-target)
+	$(hide) chmod 755 $@
+
+INTERNAL_DALVIK_MODULES += $(LOCAL_INSTALLED_MODULE)
+
+==========================================
+10、JrdLauncher Widget
+Launcher.onLongClick().showWidgetAddEdit() --> showThumbnailAnim()
+
+    void showThumbnailAnim(final boolean animated) {
+        ...
+        // 准备Workspace的动画(workspace缩放)
+        Animator workspaceAnim = mWorkspace.getChangeStateAnimation(Workspace.State.THUMBNAIL, animated);
+        if (animated) {
+            toView.setVisibility(View.VISIBLE);
+            toView.setAlpha(0f);
+            // 显示widgetview
+            final ObjectAnimator alphaAnim = ObjectAnimator.ofFloat(toView,"alpha", 0f, 1f).setDuration(fadeDuration);
+
+            // 创建动画集合对象AnimatorSet
+            mStateAnimation = LauncherAnimUtils.createAnimatorSet();
+            // 延迟startDelay秒后还是播放第一个动画alphaAnim
+            mStateAnimation.play(alphaAnim).after(startDelay);
+            // 添加监听器
+            mStateAnimation.addListener(new AnimatorListenerAdapter() {
+                boolean animationCancelled = false;
+
+                @Override
+                public void onAnimationStart(Animator animation) {
+                    updateWallpaperVisibility(true);
+                    // Prepare the position
+                    toView.setScaleX(1.0f);
+                    toView.setScaleY(1.0f);
+                    toView.setTranslationX(0.0f);
+                    toView.setTranslationY(0.0f);
+                    toView.setVisibility(View.VISIBLE);
+                    toView.bringToFront();
+                }
+
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    dispatchOnLauncherTransitionEnd(fromView, animated, false);
+                    dispatchOnLauncherTransitionEnd(toView, animated, false);
+                    if (mWorkspace != null && !LauncherApplication.isScreenLarge()) {
+                        mWorkspace.hideScrollingIndicator(true);
+                    }
+                    if (!animationCancelled) {
+                        updateWallpaperVisibility(true);
+                    }
+                    mIsAnimating = false;
+                }
+
+                @Override
+                public void onAnimationCancel(Animator animation) {
+                    animationCancelled = true;
+                    mIsAnimating = false; // PR:472121 20130621 hengfeng.liu added
+                }
+            });
+
+            /* FR:444097 20130422 hengfeng.liu modified start */
+            final ValueAnimator positionAnim = LauncherAnimUtils.ofFloat(0f, 1f);
+            final int dura = getResources().getInteger(R.integer.config_workspaceUnshrinkTime);
+            positionAnim.setDuration(dura);
+            positionAnim.addUpdateListener(new AnimatorUpdateListener() {
+                @Override
+                public void onAnimationUpdate(ValueAnimator animation) {
+                    float r = ((Float) animation.getAnimatedValue()).floatValue();
+                    float difference = r * (mDockIndicatorTranslationY);
+                    mWorkspace.getDockIndicator().setTranslationY(difference);
+                }
+            });
+            // 播放第二个动画（同时播放）
+            if (workspaceAnim != null) {
+                mStateAnimation.playTogether(workspaceAnim, positionAnim);
+            }
+            boolean delayAnim = false;
+            final ViewTreeObserver observer;
+
+            dispatchOnLauncherTransitionPrepare(fromView, animated, false);
+            dispatchOnLauncherTransitionPrepare(toView, animated, false);
+
+            final AnimatorSet stateAnimation = mStateAnimation;
+            final Runnable startAnimRunnable = new Runnable() {
+                public void run() {
+                    if (mStateAnimation != stateAnimation)
+                        return;
+                    dispatchOnLauncherTransitionStart(fromView, animated, false);
+                    dispatchOnLauncherTransitionStart(toView, animated, false);
+                    toView.post(new Runnable() {
+                        public void run() {
+                            if (mStateAnimation != stateAnimation)
+                                return;
+                            mStateAnimation.start();
+                        }
+                    });
+                }
+            };
+            if (delayAnim) {
+                final OnGlobalLayoutListener delayedStart = new OnGlobalLayoutListener() {
+                    public void onGlobalLayout() {
+                        toView.post(startAnimRunnable);
+                        observer.removeOnGlobalLayoutListener(this);
+                    }
+                };
+                observer.addOnGlobalLayoutListener(delayedStart);
+            } else {
+                startAnimRunnable.run();
+            }
+        } else {
+           ...
+    }
+// 创建workspace缩放的动画
+    Animator getChangeStateAnimation(final State state, boolean animated, int delay) {
+        ...
+        if (animated) {
+            for (int index = 0; index < getChildCount(); index++) {
+                final int i = index;
+                final CellLayout cl = (CellLayout) getChildAt(i);
+                float currentAlpha = cl.getShortcutsAndWidgets().getAlpha();
+                if (mOldAlphas[i] == 0 && mNewAlphas[i] == 0) {
+                    cl.setTranslationX(mNewTranslationXs[i]);
+                    cl.setTranslationY(mNewTranslationYs[i]);
+                    cl.setScaleX(mNewScaleXs[i]);
+                    cl.setScaleY(mNewScaleYs[i]);
+                    cl.setBackgroundAlpha(mNewBackgroundAlphas[i]);
+                    cl.setShortcutAndWidgetAlpha(mNewAlphas[i]);
+                    cl.setRotationY(mNewRotationYs[i]);
+                } else {
+                    LauncherViewPropertyAnimator a = new LauncherViewPropertyAnimator(cl);
+                    a.translationX(mNewTranslationXs[i])
+                        .translationY(mNewTranslationYs[i])
+                        .scaleX(mNewScaleXs[i])
+                        .scaleY(mNewScaleYs[i])
+                        .setDuration(duration)
+                        .setInterpolator(mZoomInInterpolator);
+                    anim.play(a);
+
+                    if (mOldAlphas[i] != mNewAlphas[i] || currentAlpha != mNewAlphas[i]) {
+                        LauncherViewPropertyAnimator alphaAnim =
+                            new LauncherViewPropertyAnimator(cl.getShortcutsAndWidgets());
+                        alphaAnim.alpha(mNewAlphas[i])
+                            .setDuration(duration)
+                            .setInterpolator(mZoomInInterpolator);
+                        anim.play(alphaAnim);
+                    }
+                    if (mOldBackgroundAlphas[i] != 0 ||
+                        mNewBackgroundAlphas[i] != 0) {
+                        ValueAnimator bgAnim = LauncherAnimUtils.ofFloat(0f, 1f).setDuration(duration);
+                        bgAnim.setInterpolator(mZoomInInterpolator);
+                        bgAnim.addUpdateListener(new LauncherAnimatorUpdateListener() {
+                                public void onAnimationUpdate(float a, float b) {
+                                    cl.setBackgroundAlpha(
+                                            a * mOldBackgroundAlphas[i] +
+                                            b * mNewBackgroundAlphas[i]);
+                                }
+                            });
+                        anim.play(bgAnim);
+                    }
+                    // Added by xiaxia.yao for PR:463972 begin
+                    // ShortcustsAndWidgets container scale animation
+                    // CR480145-Haidong-Wang-001 begin
+                    if (stateIsThumbnail || odlStateIsThumbnail) {
+                        LauncherViewPropertyAnimator scaleAnim =
+                                new LauncherViewPropertyAnimator(cl.getShortcutsAndWidgets());
+                        scaleAnim.scaleX(shortCutAndWidgetsScale)
+                                .scaleY(shortCutAndWidgetsScale)
+                                .setInterpolator(mZoomInInterpolator);
+                        anim.play(scaleAnim);
+                    }
+                    // CR480145-Haidong-Wang-001 end
+                    // Added by xiaxia.yao for PR:463972 end
+                }
+            }
+            buildPageHardwareLayers();
+            anim.setStartDelay(delay);
+        }
+        return anim;
+    }
+
+
+
+布局
+    id:drag_layer
+        上半节com.jrdcom.launcher:id/workspace
+        下半节com.jrdcom.launcher:id/widgets_customize_pane
+        
+Workspace.onPageEndMoving（）
+=======================================
+11、Launcher加载过程
+    LauncherModel
+    作用:1)通过ContentProvider读取launcher.db数据库排布设置
+                存在 --> 直接读取数据
+                不存在 --> 解析default_workspace.xml文件冰创建数据库
+         2）将workspace排布与App信息写入到容器中
+                根据ITEM_TYPE对应到xxInfo(ShortcutInfo, LauncherAppWidgetInfo ... )，再将对应View添加到容器中
+         3）利用状态容器内容构建用户界面
+         4）处理来自系统的广播
+                LauncherModel extends BroadcastReceiver
+         5）同步用户的界面操作到模型中（通过回调Callback完成）
+    Launcher.java --> onCreate()
+        LauncherModel --> startLoader()
+                public void startLoader(boolean isLaunching, int synchronousBindPage) {
+                            // added for top package feature, load top packages from a xml file.
+                            AllAppsList.loadTopPackage(mApp);
+
+                            mLoaderTask = new LoaderTask(mApp, isLaunching);
+                            if (synchronousBindPage > -1 && mAllAppsLoaded && mWorkspaceLoaded) {
+                                mLoaderTask.runBindSynchronousPage(synchronousBindPage);
+                            } else {
+                                sWorkerThread.setPriority(Thread.NORM_PRIORITY);
+                                sWorker.post(mLoaderTask);
+                            }
+                        }
+                    }
+                }
+        LauncherModel$LoaderTask -->run()
+            1）加载workspace --> loadAndBindWorkspace() {
+                    // 从数据库（表favorites）中加载workspace的内容，并将数据解析处理
+                    loadWorkspace();
+                    // 根据加载到的数据绘制直接的View视图（在主线程）
+                    bindWorkspace(-1);
+                }
+            2）加载allApps --> loadAndBindAllApps() --> loadAllAppsByBatch()
+            
+            1.1）从数据库（表favorites）中加载workspace的内容，并将数据解析处理
+                private void loadWorkspace() {
+                    1) 确保 default workspace 被加载
+                    mApp.getLauncherProvider().loadDefaultFavoritesIfNecessary(0);
+                    2) 查询
+                    final Cursor c = contentResolver.query(LauncherSettings.Favorites.CONTENT_URI, null, null, null, null);
+                    3）更新屏幕次序以及查询屏幕数量
+                    updateScreenOrder(mApp);
+                    Launcher.sScreenCount = getScreenCount(mApp , false);
+                    4）将Cursor中的数据解析
+                    final ItemInfo occupied[][][] =
+                            new ItemInfo[Launcher.sScreenCount + 1][mCellCountX + 1][mCellCountY + 1];
+                    while (!mStopped && c.moveToNext()) {
+                        ... ...
+                    }
+                    5）去除数据库中的dead data
+                    if(itemsToRemove.size() > 0) {
+                        client.delete(LauncherSettings.Favorites.getContentUri(id, false), null, null);
+                    }
+                
+                }
+            1.2）根据加载到的数据绘制直接的View视图（在主线程）
+                private void bindWorkspace(int synchronizeBindPage) {
+                    ...
+                    //
+                    unbindWorkspaceItemsOnMainThread();
+                    //
+                    filterCurrentWorkspaceItems(currentScreen, workspaceItems, currentWorkspaceItems, otherWorkspaceItems);
+                    filterCurrentAppWidgets(currentScreen, appWidgets, currentAppWidgets, otherAppWidgets);
+                    filterCurrentFolders(currentScreen, itemsIdMap, folders, currentFolders, otherFolders);
+                    // 排序
+                    sortWorkspaceItemsSpatially(currentWorkspaceItems);
+                    sortWorkspaceItemsSpatially(otherWorkspaceItems);
+                    
+                    // 在主线程中回调(Launcher)
+                    callbacks.startBinding();
+                    // 加载当前页和其它页,然后添加所有的View到workspace中
+                    bindWorkspaceItems(oldCallbacks, currentWorkspaceItems, currentAppWidgets,currentFolders, null, true);
+                    bindWorkspaceItems(oldCallbacks, otherWorkspaceItems, otherAppWidgets, otherFolders, 
+                        (isLoadingSynchronously ? mDeferredBindRunnables : null), false);
+                        
+                    // 回调完成加载（Launcher）
+                    callbacks.finishBindingItems();
+                }
+            1.2.1）更新界面，添加view
+                private void bindWorkspaceItems(final Callbacks oldCallbacks, ... ) {
+                    // 回调执行Launcher.bindItems(), Launcher.bindFolders(), Launcher.bindAppWidget()
+                    callbacks.bindItems(workspaceItems, start, start+chunkSize); --> JrdShortcut
+                    callbacks.bindFolders(folders, shouldClearAll);
+                    callbacks.bindAppWidget(widget);
+                }
+                
+                Launcher -->
+                public void bindItems(ArrayList<ItemInfo> shortcuts, int start, int end) {
+                    ...
+                    // 添加View
+                    workspace.addInScreen(shortcut, item.container,
+                                screenIndex, item.cellX, item.cellY, 1, 1, false);
+                    ...
+                }
+                
+            2) 加载allApps
+            private void loadAllAppsByBatch() {
+                List<ResolveInfo> apps = null;
+                while (i < N && !mStopped) {
+                    1) 查询所有Activities
+                    if (i == 0) {
+                        apps = packageManager.queryIntentActivities(mainIntent, 0);
+                        2）排序
+                        Collections.sort(apps, new LauncherModel.ShortcutNameComparator(packageManager, mLabelCache));
+                    }
+                    3) icon图标缓存
+                    startIndex = i;
+                    for (int j=0; i<N && j<batchSize; j++) {
+                        // This builds the icon bitmaps.
+                        mBgAllAppsList.add(new ApplicationInfo(packageManager, apps.get(i),
+                                mIconCache, mLabelCache));
+                        i++;
+                    }
+                    4）回调 
+                    mHandler.post(new Runnable() {
+                    public void run() {
+                        final long t = SystemClock.uptimeMillis();
+                        if (callbacks != null) {
+                            if (first) {
+                                callbacks.bindAllApplications(added);
+                            } else {
+                                callbacks.bindAppsAdded(added);
+                            }
+                        }
+                    }
+                });
+            }
+    Launcher.java --> bindAppsAdded(ArrayList<ApplicationInfo> added){
+                        // 添加所有查询到的ApplicationInfo
+                        if (mAppsCustomizeContent != null) {
+                            mAppsCustomizeContent.addApps(apps);
+                        }
+                    }   
+    AppsCustomizePagedView.java 
+                 public void addApps(ArrayList<ApplicationInfo> list) {
+                    addAppsWithoutInvalidate(list);
+                    reorderApps();
+                    updatePageCounts();
+                    invalidateOnDataChange();
+                }
+            --> invalidateOnDataChange()
+            --> 父类PagedView.invalidatePageData(int currentPage, boolean immediateAndOnly)
+            --> loadAssociatedPages(int page, boolean immediateAndOnly)
+            --> AppsCustomizePagedView.syncPageItems(int page, boolean immediate) {
+                    if (page < mNumAppsPages) {
+                        syncAppsPageItems(page, immediate); --> 添加View到CellLayout中layout.addViewToCellLayout(icon, ...);
+                    }else if(page>=mNumAppsPages&&page<mNumAppsPages+mNumDownloadPages){
+                        syncDownloadPageItems(page, immediate);
+                    }
+                }
+====================================
+12、Launcher widget添加流程
+----Launcher
+    点击事件
+    setupView() -->onClickAddWidgetButton(arg0) -->showAllApps(true, AppsCustomizePagedView.ContentType.Widgets, true);
+    private void showAppsCustomizeHelper(final boolean animated, final boolean springLoaded,
+                                         final AppsCustomizePagedView.ContentType contentType) {
+            ...
+            // Set the content type for the all apps/widgets space
+            mAppsCustomizeTabHost.setContentTypeImmediate(contentType);
+            ...
+    }
+----AppsCustomizeTabHost -->setContentTypeImmediate()
+----AppsCustomizePagedView
+    public void setContentType(ContentType type) {
+        // Widgets appear to be cleared every time you leave, always force invalidate for them
+        if (mContentType != type || type == ContentType.Widgets) {
+            int page = (mContentType != type) ? 0 : getCurrentPage();
+            mContentType = type;
+            // 加载页面数据，刷新界面
+            invalidatePageData(page, true);
+        }
+    }
+
+----PagedView
+    protected void invalidatePageData(int currentPage, boolean immediateAndOnly) {
+        if (mContentIsRefreshable) {
+            ...
+            // 更新界面
+            syncPages();
+            
+            // Load any pages that are necessary for the current window of views
+            loadAssociatedPages(mCurrentPage, immediateAndOnly);
+            ...
+        }
+    }
+----AppsCustomizePagedView
+    public void syncPages() {
+        if (mContentType == ContentType.Widgets) {
+          for (int j = 0; j < mNumWidgetPages; ++j) {
+              PagedViewGridLayout layout = new PagedViewGridLayout(context, mWidgetCountX,
+                  mWidgetCountY);
+              setupPage(layout);
+              addView(layout, new PagedView.LayoutParams(LayoutParams.MATCH_PARENT,
+                  LayoutParams.MATCH_PARENT));
+          }
+        } else {
+            for (int i = 0; i < mNumAppsPages; ++i) {
+                AppsCustomizeCellLayout layout = new AppsCustomizeCellLayout(context);
+                setupPage(layout);
+                addView(layout);
+            }
+            addDownloadView(context);
+        }
+    }
+    
+    // 设置页面宽高以及背景等
+    private void setupPage(PagedViewGridLayout layout) {
+        int widthSpec = MeasureSpec.makeMeasureSpec(mContentWidth, MeasureSpec.AT_MOST);
+        int heightSpec = MeasureSpec.makeMeasureSpec(mContentHeight, MeasureSpec.AT_MOST);
+
+        Drawable bg = getContext().getResources().getDrawable(R.drawable.quantum_panel_dark);
+        if (bg != null) {
+            bg.setAlpha(mPageBackgroundsVisible ? 255 : 0);
+            layout.setBackground(bg);
+        }
+        layout.measure(widthSpec, heightSpec);
+    }
+    
+    // 添加widget
+    public void syncWidgetPageItems(final int page, final boolean immediate) {
+        
+        for (int i = 0; i < items.size(); ++i) {
+            ... 
+            layout.addView(widget, lp);
+        }
+    }
+        
+===========================================
+        
+        
+        
+        

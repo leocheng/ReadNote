@@ -1,0 +1,171 @@
+1)电脑：mingxiao.li  mobile#3
+
+2)邮件：mingxiao.li  mobile#3
+
+3)在线绩效考核系统（EPAS）：
+	考核时间：上月18至本月17，考核提交/审核时间18～25日
+	网址：http://kaoqin.hq.ta-mp.com:81/index.asp
+	备用网址：http://kaoqin.hq.ta-mp.com:81/performanceReview.asp
+	帐号：mingxiao.li
+	密码：1234 或mobile#3
+
+4)Manpower：
+	填报周期为当月初至月末，每天填报所属项目不少于8小时，以周为单位
+	网址：http://10.128.161.39/mpwt/
+	帐号：limingxiao
+	密码：1111
+
+
+5)EP系统：
+	网址：http://ep.tclcom.com/
+	帐号：mingxiao.li
+	密码：mobile#3
+
+6）软件开发员工入职指引：
+	网址：http://10.128.161.108:9001/p/NewEmployeeGuide
+
+7)Bugzilla：
+	内网：http://bugzilla.tcl-ta.com
+	外网：http://tctbz.tcl-ta.com
+	帐号：mingxiao.li
+	密码：mobile#3
+
+8)项目主页：
+	网址：http://10.128.161.108:9001/p/tablet 
+
+9)WIFI:
+	帐号1：NETGEAR72 密码：tablet10fsw
+	帐号2：gmpctest 密码：gmpctclabc
+
+10)MTK:
+	帐号：zmtang
+	密码：z0605
+
+11) SIM
+	PUK码：0804 4115
+	密码：117 117 11 或123456
+
+12）部门
+	一级部门：SCD
+	二级部门：Tablet
+	三级部门：RD
+	四级部门：Software
+
+12) 刘双丽
+	密码：ssh -l shuangli.liu 10.128.161.138
+	帐号：mobile#3
+	挂载：sshfs shuangli.liu@10.128.161.138:/home/shuangli.liu /data/nishome/tdsw1/mingxiao.li/Server/
+	别名：mymount
+	将服务端文件拷贝到本地
+	    scp ./out/target/product/pop8lte/custpack/JRD_custres/app/SystemUI-res.apk mingxiao.li@10.128.181.30:~/Downloads/
+    
+    倪亮：ssh -l liang.ni 10.128.181.90
+          ssh -l liang.ni 10.128.161.137
+14) QCOM
+	帐号：mchen
+	密码：m1221
+
+15) clid
+	read
+	read
+
+16）共享盘
+	tct-hq\mingxiao.li
+
+17) github地址
+	https://github.com/AidyGo/ALauncher.git
+	
+18）打印机
+    xp-开始-运行下面路径后，找到5F-A添加即可。
+    \\printersz.hq.ta-mp.com\
+
+19）POP7KK -->Pioneer
+    POP8KK -->Discover
+======================================================
+SIM Card
+中国联通：
+    NUM：185 7661 7846
+    PUK：2303 0033
+    
+    NUM：156 0248 9504
+    PUK: 8160 2666
+    
+    NUM：156 0244 9803
+    PUK：1218 1263
+    
+    NUM：156 0248 9504
+    PUK：7477 3511
+
+
+======================================================
+
+保安电话：
+	85755
+钟耀熊：
+	85852
+余录迷：
+	85288
+余莲：
+	86788
+葛杰明：jieming.ge@jrdcom.com
+	85579
+余琳:
+	86934
+高美:
+    81909
+余莲：
+    lian.yu@tcl.com
+    86788
+    185 766 15608
+杜丹
+    81955
+    
+======================================================
+SPM    
+    POP8_LTE_GLOBAL -- zhenhua.gong
+    POP10 -- Vodafone -- lian.yu;
+    POP10 -- Global -- zhenhua.gong
+
+======================================================
+POP8_KK: 
+    SPM -- 徐斌 -- bing.xu.sz@tcl.com -- 81544
+
+======================================================
+MTK
+	1) PDF passwod: 4205161841
+	2) Bugzilla 与eService 同步project (提交问题至MTK)
+		http://bugzilla.tcl-ta.com/enter_bug.cgi?product=SW.MT8312_PLATFORM
+	3)【DCC系统】下载MTK技术资料文档
+		http://dcc.mediatek.com/Docs/default.aspx
+		用户名：jie.teng@tcl.com
+		密码：TCT@JH2117
+	4)【FEX MediaTek File Exchange System】文件传递系统
+		账号：tcl-340
+		密码：1qaz2wsX
+		Domain：选择customer
+	5)【MTK online系统】 FAQ，eCourse，DCC，FEX链接等
+		http://online.mediatek.com/Pages/default.aspx
+		用户名：jun.fu@tcl.com
+		密码：mobile#3
+	6) e-Service系统
+		http://eportal.mediatek.com/irj/portal
+		用户名：hongbo.chen
+		密码： mobile#3
+======================================================
+QCOM
+各位：
+    目前高通对应平板的TAM（Technical Account Manager）为 桂杰出 (Jerry),请在以后的CR处理中，遵循以下规则：
+    Gui, Jiechu (Jerry) jgui@qti.qualcomm.com
+        185 0300 8486
+    1．正常CR走高通系统；同时工程师可以和对应高通窗口沟通（比如高通基带对应窗口：沈卫）
+    2．紧急CR：
+        提交CR, HPM或者SPM联系Jerry，告知Jerry CR编号、问题现状、目前的困难、我们需要的帮助……
+        HPM/SPM在联系Jerry的同时，需要将项目经理、部门经理抄送其中
+        这段时间Jerry与Hui.zhang在做交接，所以近期与Jerry的沟通，都可以将高通的张辉加入其中
+    3．软件周报/周会：
+        每周四上午，TCL平板软件周报接口人（谢志恒）会将所有项目的问题清单发给Jerry
+        每周五下午（13：30），Jerry会来到平板现场支持
+
+
+
+

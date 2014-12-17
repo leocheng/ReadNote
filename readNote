@@ -1,0 +1,978 @@
+目录：
+    1、系统服务启动过程
+    2、JrdLauncher原理简述
+    3、View的事件分发顺序
+    4、访客模式 -- GuestMode
+    5、Android语言切换机制
+    6、屏幕自动旋转流程
+    7、Android Oneway Interface
+    8、Android Info类总结
+    9、Activity启动流程
+    10、消息处理机制（Handler，Looper）
+
+====================================
+疑难
+    1、Android系统是如何通过一个AndroidManifest.xml关联所有的组建的
+    2、为什么要声明权限，为什么不声名对应的权限就无法适应某些功能
+    3、Android是如何通过Fragment实现碎片化的
+    4、发起Intent为什么就能启动对应的组件（ActivityManagerService如何管理的
+
+
+
+====================================
+1、系统服务启动过程
+    1）启动系统服务
+        /base/services/java/com/android/server/SystemServer.java
+            public static void main(String[] args) {
+                ...
+                System.loadLibrary("android_servers");
+                // Initialize native services.
+                nativeInit();
+                ServerThread thr = new ServerThread();
+                thr.initAndLoop();
+            }
+            
+            SystemServer.ServerThread
+                public void initAndLoop() {
+                    ...
+                    // 添加各种服务
+                    ServiceManager.addService(Context.POWER_SERVICE, power);
+                    ServiceManager.addService(Context.ACCOUNT_SERVICE, accountManager);
+                    
+                        WindowManagerService wm = WindowManagerService.main(context, power, display, inputManager,
+                                wmHandler, factoryTest != SystemServer.FACTORY_TEST_LOW_LEVEL, !firstBoot, onlyCore);
+                    
+                    ServiceManager.addService(Context.WINDOW_SERVICE, wm);
+                    ...
+                    
+                    //tell the activity manager it is okay to run third party code.
+                    ActivityManagerService.self().systemReady(new Runnable() {
+                        public void run() {
+                            ...
+                            if (!headless) {
+                                // 启动SystemUIService
+                                startSystemUi(contextF);
+                            }
+                            ...
+                        }
+                    }
+                }
+            WindowManagerService {
+                    public static WindowManagerService main(... ...) {
+                        final WindowManagerService[] holder = new WindowManagerService[1];
+                        ... ...
+                        return holder[0];
+                    }
+            
+                    private WindowManagerService(... ...) {
+                        ...
+                        initPolicy(UiThread.getHandler());
+                        ...
+                    }
+                    
+                    // WindowManagerPolicy是一个接口
+                    final WindowManagerPolicy mPolicy = PolicyManager.makeNewWindowManager();
+                    
+                    private void initPolicy(Handler uiHandler) {
+                        uiHandler.runWithScissors(new Runnable() {
+                            @Override
+                            public void run() {
+                                WindowManagerPolicyThread.set(Thread.currentThread(), Looper.myLooper());
+                                // 实现回调， 整个初始化过程结束，准备进入APP层
+                                mPolicy.init(mContext, WindowManagerService.this, WindowManagerService.this);
+                                mAnimator.mAboveUniverseLayer = mPolicy.getAboveUniverseLayer()
+                                        * TYPE_LAYER_MULTIPLIER + TYPE_LAYER_OFFSET;
+                            }
+                        }, 0);
+                    }
+                    
+            }
+                // 启动系统UIService
+                static final void startSystemUi(Context context) {
+                    Intent intent = new Intent();
+                    intent.setComponent(new ComponentName("com.android.systemui","com.android.systemui.SystemUIService"));
+                    context.startServiceAsUser(intent, UserHandle.OWNER);
+                }
+                -->
+                    在SystemUIService中启动如下Service
+                        private final Class<?>[] SERVICES = new Class[] {
+                            com.android.systemui.recent.Recents.class,
+                            com.android.systemui.statusbar.SystemBars.class,
+                            com.android.systemui.usb.StorageNotification.class,
+                            com.android.systemui.power.PowerUI.class,
+                            com.android.systemui.media.RingtonePlayer.class,
+                            com.android.systemui.settings.SettingsUI.class,
+                        };
+                
+    2）初始化应用层
+        /base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+        
+        public class PhoneWindowManager implements WindowManagerPolicy {
+            
+                @Override
+                public void init(Context context, IWindowManager windowManager, WindowManagerFuncs windowManagerFuncs) {
+                }
+        }
+    
+ViewGroup:
+	1) onDraw(Canvas canvas)
+		绘制界面
+	2）protected void onLayout(boolean changed, int left, int top, int right, int bottom) {}
+		布局发生改变时调用该方法
+	3）protected void dispatchDraw(Canvas canvas)
+		主要用于控制子View的绘制分发
+	4）protected boolean drawChild(Canvas canvas, View child, long drawingTime)
+		直接绘制具体的子View
+	
+
+Android应用被切换到后台时（非Service后台服务），已被暂停，只保留运行状态，所以并不消耗CPU资源。
+耗电的只是在后台运行的服务
+Android每一个应用都带有一个独立的虚拟机，避免了虚拟机的崩溃导致整个系统的崩溃，代价是消耗了更多的内存。
+	    
+=======================================================================================
+2、JrdLauncher原理简述
+             -- POP8_LTE -- 20141104
+	1) 什么样的App可以当作Launcher
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN" />//程序的主界面
+            <category android:name="android.intent.category.HOME" />//系统的主界面
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.MONKEY"/>
+        </intent-filter>
+    2）新安装一个App如何进入到Launcher界面中
+        com.android.packageinstaller
+            <action android:name="android.intent.action.INSTALL_PACKAGE" />
+        安装过程：复制Apk包到data/app（系统App在system/app）目录下，解压并扫描安装包，把dex文件保存到Dalvik-cache目录下，
+                并在data/data目录下创建对应的应用数据目录
+            发送广播：ACTION_PACKAGE_ADDED 或者是ACTION_PACKAGE_REPLACED（update）
+        卸载过程：删除安装过程中在上述三个目录创建的文件及目录
+            发送广播：ACTION_PACKAGE_REMOVED
+        PackageManagerService 管理各种应用的安装、卸载、管理等工作，开机是由SystemServer启动此服务
+            frameworks/base/services/java/com/android/server/pm/PackageManagerService.java
+        该服务启动流程（构造方法中）：
+            a)扫描安装system/framework目录下的jar包
+            b)扫描安装system/app下的系统应用
+            c)扫描安装data/app下的第三方应用
+            d)扫描安装data/app-private下DRM保护的apk文件
+        
+        Launcher接收广播 -->更新数据及界面
+    
+    3）App中的Widget如何与Launcher通信
+        JrdWeather:
+            AndroidManifest.xml中声明：
+                <receiver android:name="com.jrdcom.widget.WeatherClockWidget" >
+                    <meta-data
+                        android:name="android.appwidget.provider"
+                        android:resource="@xml/appwidget_info" />
+                    ... ...
+                </receiver>
+            WeatherClockWidget extends AppWidgetProvider 
+                { ... ... }
+            AppWidgetProvider:继承于BroadcastReceiver，专门用于处理widget相关的广播
+                当这些广播事件发生的时候，AppWidgetProvider收到如下的方法调用：onUpdated,onDeleted,onEnabled,onDisabled,onReceive。
+                Widget的布局是基于RemoteViews，它并不支持布局或者view控件中的每一种。
+            RemoteViews:使用的地方：AppWidget, Notification
+                官方定义：A class that describes a view hierarchy that can be displayed in another process. 
+                The hierarchy is inflated from a layout resource file, and this class provides some basic operations for 
+                modifying the content of the inflated hierarchy. 主要是用来描述一个跨进程显示的View
+        进入Widget添加界面
+            图片：ic_widget.png --> widget_button.xml -->
+                进入界面showAllApps(true, AppsCustomizePagedView.ContentType.Widgets, true);
+        
+
+                单个Widget preview布局：apps_customize_widget.xml
+                加载类./src/com/android/launcher3/AppsCustomizePagedView.java -- 1524
+                        syncWidgetPageItems(final int page, final boolean immediate) { ...  }
+
+                
+    4）各个自定义ViewGroup的作用
+            1) 作为一个容器（Views container）
+            2) 作为一个基类（the base class for layouts）
+        com.android.launcher3.DragLayer：
+        作用：Launcher的root view，处理拖动事件以及对各个事件进行初步处理
+
+        /*
+        当View要为所有子对象分配大小和位置时，调用此方法
+        */
+        protected void onLayout(boolean changed, int l, int t, int r, int b) {
+            super.onLayout(changed, l, t, r, b);
+            int count = getChildCount();
+            for (int i = 0; i < count; i++) {
+                View child = getChildAt(i);
+                final FrameLayout.LayoutParams flp = (FrameLayout.LayoutParams) child.getLayoutParams();
+                if (flp instanceof LayoutParams) {
+                    final LayoutParams lp = (LayoutParams) flp;
+                    if (lp.customPosition) {
+                        int offsetY = mLastHeight == -1 ? 0 : getHeight() - mLastHeight;
+                        lp.y += offsetY;
+                        // 改变子view的位置
+                        child.layout(lp.x, lp.y, lp.x + lp.width, lp.y + lp.height);
+                    }
+                }
+            }
+            mLastHeight = getHeight(); // CR:511961 20130905 hengfeng.liu added
+        }
+
+        // 往viewgroup中添加组件
+        public void addView(View child) { ... ...}        
+        
+        // 获取指定位置的view
+        public View getChildAt(int index) { ... ...}
+        
+======================================
+3、View的事件分发顺序
+        public boolean dispatchKeyEvent(KeyEvent event) { ... ... }
+        /*
+         * 接收所有的触摸事件
+         * Implement this method to intercept all touch screen motion events.  This
+         * allows you to watch events as they are dispatched to your children, and
+         * take ownership of the current gesture at any point.
+         */
+        public boolean onInterceptTouchEvent(MotionEvent ev) { ... ... }
+        
+        public boolean onInterceptHoverEvent(MotionEvent ev) { ... ... }
+
+        public boolean onHoverEvent(MotionEvent ev) { ... ... }
+
+        public boolean onTouchEvent(MotionEvent ev) { ... ... }
+
+        public boolean dispatchUnhandledMove(View focused, int direction) { ... ... }
+
+        protected void dispatchDraw(Canvas canvas) { ... ... }
+        
+        ------
+        public interface OnHierarchyChangeListener {
+            public void onChildViewAdded(View parent, View child) { ... ... }
+
+            public void onChildViewRemoved(View parent, View child) { ... ...}
+
+        }
+        事件分发顺序：
+    -----------------------------------
+    View的事件分发顺序：
+            http://blog.csdn.net/lmj623565791/article/details/38960443
+        dispatchKeyEvent(KeyEvent event)
+            --> onTouchListener(MotionEvent ev)            
+                --> onTouchEvent(MotionEvent ev)
+//源码
+            public boolean dispatchTouchEvent(MotionEvent event) {
+                if (onFilterTouchEventForSecurity(event)) {
+                    ListenerInfo li = mListenerInfo;
+                    if (li != null && li.mOnTouchListener != null && (mViewFlags & ENABLED_MASK) == ENABLED
+                            && li.mOnTouchListener.onTouch(this, event)) {
+                        return true;
+                    }
+                    if (onTouchEvent(event)) {
+                        return true;
+                    }
+                }
+                return false;
+            }        
+
+            public boolean onTouchEvent(MotionEvent event) {
+                final int viewFlags = mViewFlags;
+                if ((viewFlags & ENABLED_MASK) == DISABLED) {
+                    // 该view当前是disable状态，直接消耗掉该touch事件
+                    return (((viewFlags & CLICKABLE) == CLICKABLE ||
+                            (viewFlags & LONG_CLICKABLE) == LONG_CLICKABLE));
+                }
+                if (mTouchDelegate != null) {
+                    // 直接交给事件代理者
+                    if (mTouchDelegate.onTouchEvent(event)) {
+                        return true;
+                    }
+                }
+                if (((viewFlags & CLICKABLE) == CLICKABLE ||
+                        (viewFlags & LONG_CLICKABLE) == LONG_CLICKABLE)) {
+                    // 具体的事件处理
+                    switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:{
+                            if (isInScrollingContainer) {// 如果父View是一个ViewGroup则为true，否则未false
+                                mPrivateFlags |= PFLAG_PREPRESSED;
+                                if (mPendingCheckForTap == null) {
+                                    mPendingCheckForTap = new CheckForTap();
+                                }
+                                // 180MS后发起一个检测长按任务
+                                postDelayed(mPendingCheckForTap, ViewConfiguration.getTapTimeout());
+                                    --> checkForLongClick(ViewConfiguration.getTapTimeout());
+                                        //（500 - 180）毫秒后执行检测长按的任务 -->performLongClick()
+                                        --> postDelayed(mPendingCheckForLongPress, 
+                                                ViewConfiguration.getLongPressTimeout() - delayOffset);
+                            } else {
+                                setPressed(true);
+                                checkForLongClick(0);// 500MS
+                            }
+                        }
+                    case MotionEvent.ACTION_MOVE:{// 主要是检测滑动范围是否在该view的触摸范围内
+                            final int x = (int) event.getX();
+                            final int y = (int) event.getY();
+                            if (!pointInView(x, y, mTouchSlop)) {// 判断触摸事件是否依旧在该View的范围内
+                                removeTapCallback();
+                                if ((mPrivateFlags & PFLAG_PRESSED) != 0) {
+                                    // Remove any future long press/tap checks
+                                    removeLongPressCallback();
+                                    setPressed(false);
+                                }
+                            }
+                    }
+                    case MotionEvent.ACTION_UP:{
+                        1) <= 180ms mPrivateFlags |= PFLAG_PREPRESSED; //把mPrivateFlags和PFLAG_PREPRESSED按位或赋给mPrivateFlags
+                            --> performClick()
+                            64毫秒后执行mUnsetPressedState --> setPressed(false) -->dispatchSetPressed(false);
+                        2) > 180ms && <=500ms:移除长按检测，执行onClick()回调
+                        3) > 500ms
+                        ... ...
+                        if ((mPrivateFlags & PFLAG_PRESSED) != 0 || prepressed) {
+                            if (!mHasPerformedLongPress) {// 500ms非长按事件
+                                removeLongPressCallback();
+                                if (!focusTaken) {
+                                    if (mPerformClick == null) {
+                                        mPerformClick = new PerformClick();
+                                    }
+                                    if (!post(mPerformClick)) {
+                                        performClick();
+                                    }
+                                }
+                            }
+                            if (prepressed) {
+                                postDelayed(mUnsetPressedState,
+                                        ViewConfiguration.getPressedStateDuration());
+                            } else if (!post(mUnsetPressedState)) {
+                                mUnsetPressedState.run();
+                            }
+                            ... ...
+                            removeTapCallback();
+                        }
+                    }
+                    ... ...
+                    return true;
+                }
+                return false;
+            }
+
+    // View的点击操作
+    public boolean performClick() {
+        sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_CLICKED);
+        ListenerInfo li = mListenerInfo;
+        if (li != null && li.mOnClickListener != null) {
+            playSoundEffect(SoundEffectConstants.CLICK);
+            li.mOnClickListener.onClick(this);
+            return true;
+        }
+        return false;
+    }
+    // view的长按操作
+    public boolean performLongClick() {
+        sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_LONG_CLICKED);
+        boolean handled = false;
+        ListenerInfo li = mListenerInfo;
+        if (li != null && li.mOnLongClickListener != null)
+            handled = li.mOnLongClickListener.onLongClick(View.this);
+        if (!handled)
+            handled = showContextMenu();
+        if (handled)
+            performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+        return handled;
+    }
+
+    -------------------------------
+    ViewGroup事件分发：
+    在onInterceptTouchEvent()中是否进行拦截，不拦截则将根据x,y所在的位置将touch事件分发给该view
+    
+        public boolean dispatchTouchEvent(MotionEvent ev) {
+            boolean handled = false;
+            ...
+            intercepted = onInterceptTouchEvent(ev);// 在onInterceptTouchEvent(ev)中可进行拦截，但只有为拦截时，才会进入下列if语句
+            ...
+                if (onFilterTouchEventForSecurity(ev)) {
+                    if (!canceled && !intercepted) {
+                        if (actionMasked == MotionEvent.ACTION_DOWN
+                                || (split && actionMasked == MotionEvent.ACTION_POINTER_DOWN)
+                                || actionMasked == MotionEvent.ACTION_HOVER_MOVE) {
+                            final int actionIndex = ev.getActionIndex(); // always 0 for down
+                            final int idBitsToAssign = split ? 1 << ev.getPointerId(actionIndex) : TouchTarget.ALL_POINTER_IDS;
+                            final int childrenCount = mChildrenCount;
+                            if (newTouchTarget == null && childrenCount != 0) {
+                                final float x = ev.getX(actionIndex);
+                                final float y = ev.getY(actionIndex);
+                                final View[] children = mChildren;
+                                final boolean customOrder = isChildrenDrawingOrderEnabled();
+                                for (int i = childrenCount - 1; i >= 0; i--) {
+                                    final int childIndex = customOrder ? getChildDrawingOrder(childrenCount, i) : i;
+                                    final View child = children[childIndex];
+                                    ... 
+                                    resetCancelNextUpFlag(child);
+                                    // 分发到子View --> dispatchTransformedTouchEvent() -->dispatchTouchEvent()
+                                    if (dispatchTransformedTouchEvent(ev, false, child, idBitsToAssign)) {// 
+                                        ...
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (newTouchTarget == null && mFirstTouchTarget != null) {
+                                // Did not find a child to receive the event.
+                                // Assign the pointer to the least recently added target.
+                                newTouchTarget = mFirstTouchTarget;
+                                while (newTouchTarget.next != null) {
+                                    newTouchTarget = newTouchTarget.next;
+                                }
+                                newTouchTarget.pointerIdBits |= idBitsToAssign;
+                            }
+                        }
+                    }
+                return handled;
+            }
+            dispatchKeyEvent(KeyEvent event)
+                --> onInterceptTouchEvent(MotionEvent ev)// 可在此进行事件拦截，return true：拦截该事件，否则继续向下分发
+                    --> onTouchEvent(MotionEvent ev) -- 自己处理touch事件
+1、如果ViewGroup找到了能够处理该事件的View，则直接交给子View处理，自己的onTouchEvent不会被触发；
+2、可以通过复写onInterceptTouchEvent(ev)方法，拦截子View的事件（即return true），把事件交给自己处理，则会执行自己对应的onTouchEvent方法
+3、子View可以通过调用getParent().requestDisallowInterceptTouchEvent(true);  阻止ViewGroup对其MOVE或者UP事件进行拦截；
+
+    5) 拖拽Drag
+        DragLayer.java
+        
+
+
+    6）JrdLauncher Mini App
+        mini App 布局：所有布局都在由以下xml文件中，通过解析XML文档来获取来获取所有布局
+            ./res/xml/mini_app_list.xml
+        加载布局
+            ./src/com/jrdcom/launcher/MiniAppLoader.java:117:            parser = res.getXml(R.xml.mini_app_list);
+            ./src/com/jrdcom/launcher/Launcher.java:1027:        MiniAppLoader.loadMiniAppList(this);
+            ./src/com/jrdcom/launcher/Launcher.java:9572:            MiniAppLoader.getInstance().exitMiniApp(animated);
+        实现原理：
+            通过 PopupWindow 实现，解析xml中的布局文件，确定显示位置即可
+        触摸事件拦截处理：
+            CellLayout.onTouchEvent() --> interceptMiniApp()
+                MiniAppLoader.getInstance().showMiniApp(launcher, info, mMiniShortcut,totalMotionY < 0);
+        为什么要通过加载xml来解析加载所有布局？
+            解析xml，将所有的MiniApp信息添加到一个ArrayList中，便于统一管理，比如说，查找某个MiniApp是否存在。
+
+====================================
+4、访客模式 -- GuestMode：
+    独立应用：com.jrdcom.guestmode
+        ./JrdGuestMode/src/com/jrdcom/guestmode/JrdChooseLockPIN.java
+            handleNext():
+                    GuestModeUtil guestModeUtil = GuestModeUtil.getInstance(getActivity());
+                        guestModeUtil.save(pin);// 保存PIN码
+                        SystemProperties.set("persist.security.guestmode", "1");// 设置系统属性
+                        guestModeUtil.disableADB();// 关闭ADB
+                        guestModeUtil.sendModeChangeToLauncher();//
+                        guestModeUtil.sendBroadCast(getActivity(), true); //关闭广播
+                        guestModeUtil.clearAllRecentsApp();// 清楚历史痕迹
+    发送广播：
+            public void sendBroadCast(Activity a, boolean enabled) {
+                Intent in = new Intent();
+                in.setAction(ACTION_GUESTMODE_STATUS_CHANGE);
+                in.putExtra(KEY_ENABLE, enabled);
+                a.sendBroadcast(in);
+            }
+    
+====================================
+5、Android语言切换机制
+    第一步:  判断configuration的local是否已经改变, 如果改变则将local更新到当前的configuration
+    第二步: 清空旧的资源. 
+    第三步: 重启所有所有进程并加装新资源.
+        Settings:
+            xml --> ./res/xml/language_settings.xml
+            ./src/com/android/settings/inputmethod/InputMethodAndLanguageSettings.java:123:        
+                    addPreferencesFromResource(R.xml.language_settings);
+            LocalePicker.java
+                public void onLocaleSelected(final Locale locale) {
+                    getActivity().onBackPressed();
+                    LocalePicker.updateLocale(locale);
+                }
+    --------->
+            /base/core/java/com/android/internal/app/LocalePicker.java
+                public static void updateLocale(Locale locale) {
+                    try {
+                    // 调用ActivityManagerServices的本地代理，最终执行updateConfiguration（config）方法
+                        IActivityManager am = ActivityManagerNative.getDefault();
+                        Configuration config = am.getConfiguration();
+                        config.setLocale(locale);
+                        am.updateConfiguration(config);
+                        BackupManager.dataChanged("com.android.providers.settings");
+                    } catch (RemoteException e) { ... }
+                }
+    --------->
+            /base/services/java/com/android/server/am/ActivityManagerService.java
+                public void updateConfiguration(Configuration values) {
+                    // 权限的校验
+                    enforceCallingPermission(android.Manifest.permission.CHANGE_CONFIGURATION, "updateConfiguration()");
+                    synchronized(this) {
+                        ... ...
+                        updateConfigurationLocked(values, null, false, false);
+                        Binder.restoreCallingIdentity(origId);
+                    }
+                }
+                
+                // (1) change the current configuration
+                // (2) make sure the given activity is running with the (now) current configuration
+                boolean updateConfigurationLocked(Configuration values,
+                    ActivityRecord starting, boolean persistent, boolean initLocale) {
+                    int changes = 0;
+                    if (values != null) {
+                        Configuration newConfig = new Configuration(mConfiguration);
+                        changes = newConfig.updateFrom(values);
+                        if (changes != 0) {
+                            ... ...
+                            // 保存recently运行过的进程
+                            for (int i=mLruProcesses.size()-1; i>=0; i--) {
+                                ProcessRecord app = mLruProcesses.get(i);
+                                try {
+                                    if (app.thread != null) {// 代表ApplicationThreadNative.java
+                                        app.thread.scheduleConfigurationChanged(configCopy);
+                                    }
+                                } catch (Exception e) { ... }
+                            }
+                            // 发送广播
+                            Intent intent = new Intent(Intent.ACTION_CONFIGURATION_CHANGED);
+                            intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY
+                                    | Intent.FLAG_RECEIVER_REPLACE_PENDING
+                                    /*| Intent.FLAG_RECEIVER_FOREGROUND*/); // downgrade to background
+                            broadcastIntentLocked(null, null, intent, null, null, 0, null, null,
+                                    null, AppOpsManager.OP_NONE, false, false, MY_PID,
+                                    Process.SYSTEM_UID, UserHandle.USER_ALL);
+                            ...
+                        }
+                    }
+                    // 确保所有的activity运行的是当前configuration
+                    ...
+                    return kept;
+                }
+            LRU: Least Recently Used保存所有运行过的进程.  ProcessRecord进程类, 一个apk文件运行时会对应一个进程. 
+                    app.thread. 此处的thread代表的是ApplicationThreadNative.java类型
+    --------->
+            /base/core/java/android/app/ApplicationAppNative.java
+                            //又是通过binder调用, 所以 , binder在android中是一个很重要的概念. 
+                        此处远程调用的是ActivityThread.java中的私有内部内ApplicationThread
+                public final void scheduleConfigurationChanged(Configuration config) throws RemoteException {
+                    Parcel data = Parcel.obtain();
+                    data.writeInterfaceToken(IApplicationThread.descriptor);
+                    config.writeToParcel(data, 0);
+                    mRemote.transact(SCHEDULE_CONFIGURATION_CHANGED_TRANSACTION, data, null, IBinder.FLAG_ONEWAY);
+                    data.recycle();
+                }
+    --------->
+            /base/core/java/android/app/ActivityThread.java
+            内部类
+            private class ApplicationThread extends ApplicationThreadNative {
+                
+                public void scheduleConfigurationChanged(Configuration config) {
+                    updatePendingConfiguration(config);
+                    sendMessage(H.CONFIGURATION_CHANGED, config);
+                }
+            ApplicationThread中的handler的CONFIGURATION_CHANGED是调用 handleConfigurationChanged()
+            -->
+            final void handleConfigurationChanged(Configuration config, CompatibilityInfo compat) {
+                int configDiff = 0;
+                synchronized (mResourcesManager) {
+                    ... 
+                    // 更新Config到Resource
+                    mResourcesManager.applyConfigurationToResourcesLocked(config, compat);
+                    ... 
+                }
+                    ... 
+                  // 循环当前进程的所有Activity
+                if (callbacks != null) {
+                    final int N = callbacks.size();
+                    for (int i=0; i<N; i++) {
+                        performConfigurationChanged(callbacks.get(i), config);
+                    }
+                }
+            }
+            --------->
+                /base/core/java/android/app/ResourcesManager.java
+                public final boolean applyConfigurationToResourcesLocked(Configuration config, CompatibilityInfo compat) {
+                            ...
+                            //清除一部分系统资源, 并且将config更新到Resources, 而Resources包含了一个AssetManager对象, 
+                            //该对象的核心实现是在AssetManager.cpp中完成的. 然后循环清空mActivityResources资源
+                            Resources.updateSystemConfiguration(config, defaultDisplayMetrics, compat);
+                            ...
+                            for (int i=mActiveResources.size()-1; i>=0; i--) {
+                                if (r != null) {
+                                    ...
+                                    if (!isDefaultDisplay || hasOverrideConfiguration) {
+                                        ...
+                                        r.updateConfiguration(tmpConfig, dm, compat);
+                                    } else {
+                                        r.updateConfiguration(config, dm, compat);
+                                    }
+                                } else {
+                                    mActiveResources.removeAt(i);
+                                }
+                            }
+                            return changes != 0;
+                        }
+    --------->
+            /base/core/java/android/app/ActivityThread.java 
+                    
+                private static void performConfigurationChanged(ComponentCallbacks2 cb, Configuration config) {
+                    ...
+                    // 如果configuration发生改变则执行onConfigurationChange(config)
+                    if (shouldChangeConfig) {
+                        cb.onConfigurationChanged(config);
+                        ... 
+                    }
+                }
+    --------->
+            /base/core/java/android/app/Activity.java 
+            如果你的activity运行 , 设备信息有改变(即configuration改变)时由系统调用. 
+            如果你在manifest.xml中配置了configChnages属性则表示有你自己来处理configuration change. 
+            否则就重启当前这个activity.  而重启之前, 旧的resources已经被清空, 那么就会装载新的资源, 
+            整个过程就完成了语言切换后 , 能够让所有app使用新的语言
+            public void onConfigurationChanged(Configuration newConfig) {
+                mCalled = true;
+                mFragments.dispatchConfigurationChanged(newConfig);
+                if (mWindow != null) {
+                    mWindow.onConfigurationChanged(newConfig);
+                }
+                if (mActionBar != null) {
+                    mActionBar.onConfigurationChanged(newConfig);
+                }
+            }
+====================================
+6、屏幕自动旋转流程
+        <CheckBoxPreference
+                android:key="toggle_lock_screen_rotation_preference"
+                android:title="@string/accelerometer_title"
+                android:persistent="false"/>
+Settings --> Accessibility --> Auto-rotate screen
+accelerometer_title
+    accessibility_settings.xml
+./src/com/android/settings/accessibility/AccessibilitySettings.java:268:
+
+    private void handleLockScreenRotationPreferenceClick() {
+        RotationPolicy.setRotationLockForAccessibility(getActivity(),
+                !mToggleLockScreenRotationPreference.isChecked());
+    }
+    
+PhoneWindowManager.SettingsObserver.
+    resolver.registerContentObserver(Settings.System.getUriFor(
+                    Settings.System.ACCELEROMETER_ROTATION), false, this,
+                    UserHandle.USER_ALL);      
+    updateSettings() --> updateOrientationListenerLp() --> mOrientationListener.enable()
+    
+WindowOrientationListener.enable()
+    public void enable() {
+        synchronized (mLock) {
+            if (mEnabled == false) {
+                mSensorEventListener.resetLocked();
+                mSensorManager.registerListener(mSensorEventListener, mSensor, mRate, mHandler);
+                mEnabled = true;
+            }
+        }
+    }
+mSensorEventListener --> SensorEventListenerImpl -->
+    onSensorChanged
+    
+    
+View.java
+    layout(){
+        
+        boolean changed = isLayoutModeOptical(mParent) ?
+                setOpticalFrame(l, t, r, b) : setFrame(l, t, r, b);
+                
+        onLayout()
+        
+====================================
+7、Android Oneway Interface
+    In early betas, the Android IPC was strictly synchronous. This means that service invocations had to wait for the return value of the remote method to arrive back to the caller. This is generally an advantage because the caller can be sure that the called service received the invocation by the time the remote method returns. In some cases, however, this causes the caller to wait unnecessarily. If synchronicity is not required and the method has no return value, oneway AIDL interfaces may be used.
+
+    Oneway methods are specified by addind the oneway keyword to the AIDL interface definition.
+                   
+    keyguard: /frameworks/base/core/java/com/android/internal/policy/IKeyguardService.aidl
+    interface IKeyguardService {
+        boolean isShowing();
+        boolean isSecure();
+        oneway void verifyUnlock(IKeyguardExitCallback callback);
+        oneway void keyguardDone(boolean authenticated, boolean wakeup);
+        oneway void setHidden(boolean isHidden);
+        ...
+        }
+
+====================================
+8、Android Info类总结
+    PackageItemInfo
+        直接子类：ApplicationInfo, ComponentInfo, InstrumentationInfo, PermissionGroupInfo, PermissionInfo
+        间接子类：ActivityInfo, ServiceInfo, ProviderInfo
+    ApplicationInfo:对应一个AndroidManifest.xml
+    ResolveInfo:通过解析一个与IntentFilter相符合的Intent得到的信息
+    PackageManager:getPackageManager(),关联了当前装载的所有应用的包信息
+
+
+
+====================================
+9、Activity启动流程
+点击Launcher中的图标，启动一个App的MainActivity
+Launcher.onClick() {
+    boolean success = startActivitySafely(v, intent, tag);
+}
+
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+    startActivityFlag = startActivity(v, intent, tag);
+
+android.app.Activity
+    startActivity(Intent intent, Bundle options)
+        --> startActivityForResult(intent, -1, options);
+        
+    public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
+        if (mParent == null) {
+            // mInstrumentation：表示Instrumentation，用来监控应用程序和系统的交互
+            // mMainThread：ActivityThread，表示应用程序的主线程，这里通过mMainThread.getApplicationThread获得它里面的ApplicationThread成员变量，它是一个Binder对象，后面我们会看到，ActivityManagerService会使用它来和ActivityThread来进行进程间通信，此处的主线程表示的是Launcher的主线程
+            Instrumentation.ActivityResult ar =
+                mInstrumentation.execStartActivity( this, mMainThread.getApplicationThread(), mToken, this, intent, requestCode, options);
+            ...
+        } else {
+            ...
+        }
+    }
+android.app.Instrumentation
+    public ActivityResult execStartActivity(
+            Context who, IBinder contextThread, IBinder token, Activity target,
+            Intent intent, int requestCode, Bundle options) {
+        IApplicationThread whoThread = (IApplicationThread) contextThread;
+        ...
+        try {
+            intent.migrateExtraStreamToClipData();
+            intent.prepareToLeaveProcess();
+            // 这里的ActivityManagerNative.getDefault返回ActivityManagerService的远程接口，即ActivityManagerProxy接口
+            int result = ActivityManagerNative.getDefault()
+                .startActivity(whoThread, who.getBasePackageName(), intent,
+                        intent.resolveTypeIfNeeded(who.getContentResolver()),
+                        token, target != null ? target.mEmbeddedID : null,
+                        requestCode, 0, null, null, options);
+            checkStartActivityResult(result, intent);
+        } catch (RemoteException e) {
+        }
+        return null;
+    }
+android.app.ActivityManagerNative.ActivityManagerProxy
+    public int startActivity(IApplicationThread caller, String callingPackage, Intent intent,
+            String resolvedType, IBinder resultTo, String resultWho, int requestCode,
+            int startFlags, String profileFile,
+            ParcelFileDescriptor profileFd, Bundle options) throws RemoteException {
+        Parcel data = Parcel.obtain();
+        Parcel reply = Parcel.obtain();
+
+        data.writeInterfaceToken(IActivityManager.descriptor);
+        data.writeStrongBinder(caller != null ? caller.asBinder() : null);
+        data.writeString(callingPackage);
+        intent.writeToParcel(data, 0);
+        ...
+       
+        // 通过Binder驱动程序就进入到ActivityManagerService的startActivity函数
+        mRemote.transact(START_ACTIVITY_TRANSACTION, data, reply, 0);
+        reply.readException();
+        int result = reply.readInt();
+        reply.recycle();
+        data.recycle();
+        return result;
+    }
+
+ActivityManagerService
+    @Override
+    public final int startActivity(IApplicationThread caller, String callingPackage,
+            Intent intent, String resolvedType, IBinder resultTo,
+            String resultWho, int requestCode, int startFlags,
+            String profileFile, ParcelFileDescriptor profileFd, Bundle options) {
+        return startActivityAsUser(caller, callingPackage, intent, resolvedType, resultTo,
+                resultWho, requestCode,startFlags, profileFile, profileFd, options, UserHandle.getCallingUserId());
+    }
+
+    @Override
+    public final int startActivityAsUser(IApplicationThread caller, String callingPackage,
+            Intent intent, String resolvedType, IBinder resultTo,
+            String resultWho, int requestCode, int startFlags,
+            String profileFile, ParcelFileDescriptor profileFd, Bundle options, int userId) {
+        enforceNotIsolatedCaller("startActivity");
+        userId = handleIncomingUser(Binder.getCallingPid(), Binder.getCallingUid(), userId,
+                false, true, "startActivity", null);
+        // mStackSupervisor：ActivityStack
+        return mStackSupervisor.startActivityMayWait(caller, -1, callingPackage, intent, resolvedType,
+                resultTo, resultWho, requestCode, startFlags, profileFile, profileFd,
+                null, null, options, userId);
+    }
+    
+ActivityStackSupervisor
+    final int startActivityMayWait(IApplicationThread caller, int callingUid,
+            String callingPackage, Intent intent, String resolvedType, IBinder resultTo,
+            String resultWho, int requestCode, int startFlags, String profileFile,
+            ParcelFileDescriptor profileFd, WaitResult outResult, Configuration config,
+            Bundle options, int userId) {
+            ...
+        IIntentSender target = mService.getIntentSenderLocked(
+                                ActivityManager.INTENT_SENDER_ACTIVITY, "android",
+                                realCallingUid, userId, null, null, 0, new Intent[] { intent },
+                                new String[] { resolvedType }, PendingIntent.FLAG_CANCEL_CURRENT
+                                | PendingIntent.FLAG_ONE_SHOT, null);
+        // 参数intent的内容进行解析            
+        try {
+            ResolveInfo rInfo =
+                AppGlobals.getPackageManager().resolveIntent(
+                        intent, null,
+                        PackageManager.MATCH_DEFAULT_ONLY
+                        | ActivityManagerService.STOCK_PM_FLAGS, userId);
+            aInfo = rInfo != null ? rInfo.activityInfo : null;
+            aInfo = mService.getActivityInfoForUser(aInfo, userId);
+        } catch (RemoteException e) {
+            aInfo = null;
+        }
+        
+        int res = startActivityLocked(caller, intent, resolvedType,
+        aInfo, resultTo, resultWho, requestCode, callingPid, callingUid,
+        callingPackage, startFlags, options, componentSpecified, null);
+
+    }
+
+    final int startActivityLocked(IApplicationThread caller,
+            Intent intent, String resolvedType, ActivityInfo aInfo, IBinder resultTo,
+            String resultWho, int requestCode,
+            int callingPid, int callingUid, String callingPackage, int startFlags, Bundle options,
+            boolean componentSpecified, ActivityRecord[] outActivity) { 
+            
+            ...
+            if (abort) {
+            if (resultRecord != null) {
+                resultStack.sendActivityResultLocked(-1, resultRecord, resultWho, requestCode,
+                        Activity.RESULT_CANCELED, null);
+            }
+            // We pretend to the caller that it was really started, but they will just get a cancel result.
+            setDismissKeyguard(false);
+            ActivityOptions.abort(options);
+            return ActivityManager.START_SUCCESS;
+            
+            
+            mService.doPendingActivityLaunchesLocked(false);
+
+            err = startActivityUncheckedLocked(r, sourceRecord, startFlags, true, options);
+
+            ...
+        }
+
+====================================
+10、消息处理机制（Handler，Looper）
+http://blog.csdn.net/luoshengyang/article/details/6817933
+    它不是马上就处理这个请求，而是将这个请求封装成一个消息，然后把这个消息放在应用程序的消息队列中去，然后再通过消息循环来处理这个消息。
+    这样做的好处就是消息的发送方只要把消息发送到应用程序的消息队列中去就行了，它可以马上返回去处理别的事情，而不需要等待消息的接收方去处理完这个消息才返回，这样就可以提高系统的并发性。实质上，这就是一种异步处理机制
+    
+    主要流程：消息循环、消息发送和消息处理
+        
+--ActivityThread.java
+    应用程序在进程中启动执行，进入main方法，实现消息的循环
+    public static void main(String[] args) {
+        Environment.initForCurrentUser();
+        Security.addProvider(new AndroidKeyStoreProvider());
+        Process.setArgV0("<pre-initialized>");
+        
+        Looper.prepareMainLooper();// 创建Looper对象
+
+        ActivityThread thread = new ActivityThread();
+        thread.attach(false);
+        
+        if (sMainThreadHandler == null) {
+            sMainThreadHandler = thread.getHandler();
+        }
+        AsyncTask.init();
+        Looper.loop();
+        throw new RuntimeException("Main thread loop unexpectedly exited");
+    }
+--Looper.java
+Looper {
+    public static void prepareMainLooper() {
+        prepare(false);
+        synchronized (Looper.class) {
+            if (sMainLooper != null) {
+                throw new IllegalStateException("The main Looper has already been prepared.");
+            }
+            sMainLooper = myLooper(); // 在线程中创建一个Looper对象
+        }
+    } 
+    
+    public static Looper myLooper() {
+        // Threadocal的一个局部变量，保证每一个线程都有一个独立的Looper对象
+        // Looper对象在ThreadLocal当中new的
+        return sThreadLocal.get();
+    }
+    
+    // 创建Looper的同时会创建一个MessageQueue对象
+    private Looper(boolean quitAllowed) {
+        mQueue = new MessageQueue(quitAllowed);
+        mThread = Thread.currentThread();
+    }
+    
+    private static void prepare(boolean quitAllowed) {
+        if (sThreadLocal.get() != null) {
+            throw new RuntimeException("Only one Looper may be created per thread");
+        }
+        sThreadLocal.set(new Looper(quitAllowed));
+    }
+    
+    public static void loop() {
+        final Looper me = myLooper();
+        final MessageQueue queue = me.mQueue;
+
+        // Make sure the identity of this thread is that of the local process,
+        // and keep track of what that identity token actually is.
+        Binder.clearCallingIdentity();
+        final long ident = Binder.clearCallingIdentity();
+
+        // 死循环
+        for (;;) {
+            Message msg = queue.next(); // might block
+            // This must be in a local variable, in case a UI event sets the logger
+            Printer logging = me.mLogging;
+
+            msg.target.dispatchMessage(msg);
+
+            // Make sure that during the course of dispatching the
+            // identity of the thread wasn't corrupted.
+            final long newIdent = Binder.clearCallingIdentity();
+
+            msg.recycle();
+        }
+    }
+}
+创建MessageQueue对象
+----MessageQueue.java
+    MessageQueue(boolean quitAllowed) {
+        mQuitAllowed = quitAllowed;
+        mPtr = nativeInit();
+    }
+----android_os_MessageQueue.cpp
+    static jint android_os_MessageQueue_nativeInit(JNIEnv* env, jclass clazz) {
+        NativeMessageQueue* nativeMessageQueue = new NativeMessageQueue();
+        if (!nativeMessageQueue) {
+            jniThrowRuntimeException(env, "Unable to allocate native queue");
+            return 0;
+        }
+        nativeMessageQueue->incStrong(env);
+        return reinterpret_cast<jint>(nativeMessageQueue);
+    }
+    // 在JNI层创建一个NativeMessageQueue对象
+    NativeMessageQueue::NativeMessageQueue() : mInCallback(false), mExceptionObj(NULL) {
+        mLooper = Looper::getForThread();
+        if (mLooper == NULL) {
+            mLooper = new Looper(false);
+            Looper::setForThread(mLooper);// 在内部创建一个Looper对象，该Looper对象属于JNI层的
+        }
+    }
+
+
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
