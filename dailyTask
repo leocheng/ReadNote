@@ -3989,6 +3989,31 @@ Problems：
 Tablets 11月员工动员大会”，请大家提前做好工作安排，准时参加！
 时间：本周三（12月17日）下午17:00~18:30pm
 地点：A9 球形会议室
+
+    POP10_VF_Email 
+    
+    
+    2.2.5　编译生成本地Android SDK
+
+还记得前面下载和安装的Android官方发布的SDK吗？既然已经下载了Android 4.0.3源代码，就可以根据Android源代码编译本地的Android SDK，详情见如下操作及相关说明：
+
+$cd $workdir  
+$make sdk /* 在Android 4.0之前的版本直接用make SDK就能正常编译完成，但到了4.0版本就需要做一些预编译的工作了，否则直接编译SDK会有编译错误出现 */  
+//采用如下的编译过程就能正常编译出本地Android SDK  
+$. build/envsetup.sh//这里容易出错的地方就是，build前有一个空格  
+$lunch sdk-eng//加载sdk-eng，默认是full-eng  
+$make sdk//编译SDK  
+//编译成功后有如下日志  
+Package SDK: out/host/linux-x86/sdk/android-sdk_eng.android_linux-x86.zip  
+//将刚编译出的SDK压缩包复制出来，在做make编译全部代码时会删除此文件，这样避免了重复编译SDK  
+$cd $workdir/out/host/linux-x86/sdk/  
+$cp android-sdk_eng.android_linux-x86.zip $workdir/  
+$tar –xvf $workdir/android-sdk_eng.android_linux-x86.zip  
+//可对比一下官方发布的SDK与本地编译的SDK有什么区别 
+
+
+
+
         
 	疑难：
 	–---------------------------------------------------------------------------

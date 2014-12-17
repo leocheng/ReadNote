@@ -9,6 +9,8 @@
     8、Android Info类总结
     9、Activity启动流程
     10、消息处理机制（Handler，Looper）
+    11、SVG图
+    12、编译生成本地Android SDK
 
 ====================================
 疑难
@@ -960,19 +962,37 @@ Looper {
         }
     }
 
+===========================================
+11、SVG图
+http://www.w3.org/TR/SVG11/paths.html#PathData
 
+VectorDrawable:
+解析
+private void updateStateFromTypedArray(TypedArray a) {
+    final String pathData = a.getString(R.styleable.VectorDrawablePath_pathData);
+    if (pathData != null) {
+        mNodes = PathParser.createNodesFromPathData(pathData);
+    } 
+}
         
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+===========================================
+12、编译生成本地Android SDK
+    $. build/envsetup.sh//这里容易出错的地方就是，build前有一个空格  
+    $lunch sdk-eng//加载sdk-eng，默认是full-eng  
+    $make sdk//编译SDK
+    生成目录
+        Package SDK: out/host/linux-x86/sdk/android-sdk_eng.android_linux-x86.zip  
+    //将刚编译出的SDK压缩包复制出来，在做make编译全部代码时会删除此文件，这样避免了重复编译SDK  
+        $cd $workdir/out/host/linux-x86/sdk/  
+        $cp android-sdk_eng.android_linux-x86.zip $workdir/  
+        $tar –xvf $workdir/android-sdk_eng.android_linux-x86.zip
+
+
+
+
+
+
+
+
+
+
