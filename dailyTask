@@ -4014,16 +4014,94 @@ $tar –xvf $workdir/android-sdk_eng.android_linux-x86.zip
 
 
 
-        
+
 	疑难：
 	–---------------------------------------------------------------------------
-	
+
   ==================================== 
   周四：2014-12-18
 	任务：
 	–---------------------------------------------------------------------------
+	1) PR:840370 -- pixo8_3g -- 锁平界面转屏出现半屏现象
+	    -- pad roate the screen in lock screen ,the sreen display error -- 转给ling.cai@tcl.com
+	
+    2) PR:875619 -- POP10 -- [Perso][VF]Customized Chrome homepage and bookmark,it's invalid. -- 已转yaoxiong.zhong
+[Expected Behaviour]：
+1.把def_chrome_homepage订制成http://www.163.com
+2.把def_Chrome_bookmark1_name订制成：JD
+3.把def_Chrome_bookmark1_url订制成：http://www.jd.com
 
+代码位置：
+    pop10_vf/packages/apps/ChromeCustomizations
+    pop10_vf/packages/providers/PartnerBookmarksProvider
+    
+./device/tct/alto45_orange/perso/plf/vendor/tct/source/frameworks/res/isdm_tct.framework-res.splf:18:
+        <SDMID>def_chrome_homepage</SDMID>
+grep: ./device/tct/common/.git/svn: No such file or directory
+./device/tct/common/perso/plf/vendor/tct/source/frameworks/res/isdm_tct.framework-res.plf:675:
+        <SDMID>def_chrome_homepage</SDMID>
+./device/tct/common/perso/plf/vendor/tct/source/frameworks/res/isdm_tct.framework-res.plf:676:
+        <C_NAME>def_chrome_homepage</C_NAME>
+grep: ./device/tct/pop8lte/.git/svn: No such file or directory
+./device/tct/pop8lte/perso/plf/vendor/tct/source/frameworks/res/isdm_tct.framework-res.splf:18:
+        <SDMID>def_chrome_homepage</SDMID>
+
+
+<VALUE>0x0C,(0x00,0x47,0x00,0x6F,0x00,0x6F,0x00,0x67,0x00,0x6C,0x00,0x65)</VALUE>
+    
+    ./packages/apps/ChromeCustomizations/src/com/android/partnerbrowsercustomizations/example/PartnerHomepageProviderExample.java:47:        HOMEPAGE_URI = mTConfig.getString("def_chrome_homepage","http://www.android.com/");
+    
+    
+    3) PR:871801 -- POP10 -- [calendar]Need to add "Frist week of year"
+        pop8_lte_dev已解决
+        ./res/values/strings.xml:768:    <string name="preferences_alerts_first_week_title">"First week of year"</string>
+        ./res/values/strings.xml:770:    <string name="alerts_dialog_first_week_title">"First week of year"</string>
         
+        ./res/xml/general_preferences.xml:68:            android:title="@string/preferences_alerts_first_week_title" />
+        
+        ./src/com/android/calendar/GeneralPreferences.java:188:                R.xml.general_preferences, false);
+        ./src/com/android/calendar/GeneralPreferences.java:204:        addPreferencesFromResource(R.xml.general_preferences);
+        
+        <!--[FEATURE]-Add-BEGIN by TCTNJ.chongqing.zhong,04/02/2014,622693,-->
+        <ListPreference
+            android:dialogTitle="@string/alerts_dialog_first_week_title"
+            android:entries="@array/preferences_first_week_entry"
+            android:entryValues="@array/preferences_first_week_value"
+            android:key="preferences_first_week_option"
+            android:title="@string/preferences_alerts_first_week_title" />
+        <!--[FEATURE]-Add-END by TCTNJ.chongqing.zhong-->
+        
+        
+        MSGM字符串添加 ---  DONE
+            <string name="preferences_alerts_first_week_title">"First week of year"</string>
+            <string name="alerts_dialog_first_week_title">"First week of year"</string>
+            
+            <string-array name="preferences_first_week_entry">
+                <item>"Start on Jan 1"</item>
+                <item>"Start on first 4-day week"</item>
+                <item>"Start on first full week"</item>
+            </string-array>
+            
+        SDIM值定制 -- DONE
+        
+        ./tct/common/perso/plf/packages/apps/Calendar/isdm_Calendar.plf:20:<SDMID>def_calendar_firstWeekOfYear</SDMID>
+            
+            
+            arrays.xml
+            strings.xml
+            utils.java
+            
+    周会：13：30-14：30 -- 六楼大会议室
+    
+    PR:863960 -- POP10 -- [calendar]qucik responses can save as empty
+    general_preferences.xml
+        <PreferenceScreen
+            android:key="preferences_quick_responses"
+            android:fragment="com.android.calendar.QuickResponseSettings"
+            android:title="@string/quick_response_settings"
+            android:summary="@string/quick_response_settings_summary" />
+
+    
 
 	疑难：
 	–---------------------------------------------------------------------------
