@@ -11,6 +11,8 @@
     10、消息处理机制（Handler，Looper）
     11、SVG图
     12、编译生成本地Android SDK
+    13、进程间通信--binder
+    14、泛型类设计
 
 ====================================
 疑难
@@ -987,10 +989,14 @@ private void updateStateFromTypedArray(TypedArray a) {
         $cp android-sdk_eng.android_linux-x86.zip $workdir/  
         $tar –xvf $workdir/android-sdk_eng.android_linux-x86.zip
 
+===========================================
+13、进程间通信--binder
+    Binder机制由4部分组成：Client, Server, Service Manager, Binder驱动程序
+    Client和Server之间通过Binder和Service Manager进行通信
 
-
-
-
+===========================================
+14、泛型类设计
+    泛型类：拥有一个或多个类型变量的类
 
 
 

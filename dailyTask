@@ -4110,6 +4110,165 @@ grep: ./device/tct/pop8lte/.git/svn: No such file or directory
   周五：2014-12-19
 	任务：
 	–---------------------------------------------------------------------------
+    PR:871502 -- [calendar]The agenda menu UI needs to be adjusted
+    ListView: com.android.calendar:id/agenda_events_list
+布局：
+    ./res/layout-sw600dp/agenda_fragment.xml:30:            android:id="@+id/agenda_events_list"
+    ./res/layout/agenda_fragment.xml:30:            android:id="@+id/agenda_events_list"
+    
+    ./src/com/android/calendar/agenda/AgendaFragment.java:495:        return (AgendaListView)v.findViewById(R.id.agenda_events_list);
+    
+    Header:agenda_day.xml
+    ./src/com/android/calendar/agenda/AgendaByDayAdapter.java:202:  agendaDayView = mInflater.inflate(R.layout.agenda_day, parent, false);
+    AgendaListView -->  AgendaWindowAdapter
+   
+    
+    
+        
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周一：2014-12-22
+	任务：
+	–---------------------------------------------------------------------------
+    PR: 871502 -- POP10 -- [calendar]The agenda menu UI needs to be adjusted
+    复现路径：
+    产生原因：与传入的时间有关，==>转换成最近的事件的时间
+    处理结果：当不显示的时候就都不显示
+    潜在影响：
+    // Header布局
+        Header:agenda_day.xml
+    ./src/com/android/calendar/agenda/AgendaByDayAdapter.java:202:  agendaDayView = mInflater.inflate(R.layout.agenda_day, parent, false);
+    AgendaListView -->  AgendaWindowAdapter
+
+AgendaFragment
+    StickyHeaderListView
+        AgendaListView --> AgendaWindowAdapter -->AgendaByDayAdapter: agenda_day
+                                                  AgendaAdapter: agenda_item
+方案一：修正时间
+方案二：不显示的时候隐藏
+
+        
+
+
+
+紧急通话按钮
+id == com.google.android.setupwizard:id/welcome_emergency_dial
+/data/nishome/tdsw1/mingxiao.li/projects/qcom/pop10_vf/frameworks/base/core/res/isdm_framework-res.plf
+/data/nishome/tdsw1/mingxiao.li/projects/qcom/pop10_vf/frameworks/base/core/res/res/values
+    <!--bool name="config_voice_capable">true</bool-->
+WelcomeActivity
+
+    private void initViews() {
+        if (isPrimaryUser()) {
+              this.mLanguagePicker.setOnLanguageSelectedListener(new WelcomeActivity.6(this));
+              updateAvailableLocales();
+              this.mEmergencyCallButton = ((Button)findViewById(2131624039));
+              
+              if (!getResources().getBoolean(17956931))
+              
+                break label185;
+              this.mEmergencyCallButton.setOnClickListener(this);
+        }
+        while (true) {
+              updateContentView();
+              return;
+              this.mLanguagePicker.setVisibility(8);
+              break;
+              label185: this.mEmergencyCallButton.setVisibility(8);
+        }
+  }
+      
+十进制：17956931   十六进制：1120043
+      ./obj/APPS/framework-res_intermediates/public_resources.xml:166813:  
+      <public type="bool" name="config_bluetooth_wide_band_speech" id="0x01120043" />
+        
+        config_voice_capable
+
+./frameworks/base/core/res/res/values/config.xml:1004:    <bool name="config_bluetooth_wide_band_speech">true</bool>
+./out/target/perso/pop10/jrdResAssetsCust/frameworks/base/core/res/res/values/config.xml:1004:    <bool name="config_bluetooth_wide_band_speech">true</bool>
+./out/target/common/obj/APPS/framework-res_intermediates/public_resources.xml:166813:  <public type="bool" name="config_bluetooth_wide_band_speech" id="0x01120043" />    
+    
+    
+        
+	疑难：
+	–---------------------------------------------------------------------------
+	
+  ==================================== 
+  周二：2014-12-23
+	任务：
+	–---------------------------------------------------------------------------
+    填写Epas -- done
+    反编译：http://blog.sina.com.cn/s/blog_5a383493010171sx.html
+    
+    
+    
+	疑难：
+	–---------------------------------------------------------------------------
+	
+  ==================================== 
+  周三：2014-12-24
+	任务：
+	–---------------------------------------------------------------------------
+    PR：881555 -- [Chrome]Enter the Youku to see the video, tablet restart
+    30949 -- 12-23 04:31:32.721 I/ActivityManager( 6629): Process com.android.chrome (pid 9454) has died
+    
+    97704 -- 12-23 04:49:02.416 I/ActivityManager(12268): Killing 14334:com.android.chrome/u0a115 (adj 15): empty #17
+        
+        
+      58339  12-23 04:47:54.084 E/Zygote  ( 6393): Exit zygote because system server (10) has terminated
+        
+        
+	疑难：
+	–---------------------------------------------------------------------------
+	
+  ==================================== 
+  周四：2014-12-25
+	任务：
+	–---------------------------------------------------------------------------
+    《JAVA并发编程》《JAVA并发实战》
+    《算法导论》-- Thomas H.Corman
+    《算法设计手册》-- Steven Skiena
+        编程珠玑”、“C++ Prime”、“C专家编程”、“Effective C++”、“Effective Java”
+     
+     《程序员修炼之道》
+     《互联网创业启示录》
+     《黑客与画家》
+     《编译原理》
+     《深入理解计算机系统》
+     《代码大全》
+     《算法导论》
+     《人月神话》
+     --
+     《大数据时代》
+     《淘宝技术这十年》
+     《白帽子将web安全》
+     《重构：改造既有代码的设计》
+     《代码整洁之道》
+     --
+     《Effective Java》
+     《Java并发编程实战》
+     《深入Java虚拟机》
+     《Java与模式》
+     《Web前端黑客技术揭秘》
+     《浪潮之巅》
+     《游戏改变世界》
+     《免费：商业的未来》
+     《逻辑思维》
+     --
+     《简约至上：交互式设计四策略》
+     《HEAD FIRST设计模式》
+     《程序员的数学思维修炼》
+     《互联网金融》
+     《互联网时代的软件革命》
+
+	疑难：
+	–---------------------------------------------------------------------------
+	
+  ==================================== 
+  周五：2014-12-26
+	任务：
+	–---------------------------------------------------------------------------
 
         
 	疑难：

@@ -146,6 +146,9 @@ error: failed to push some refs to 'ssh://mingxiao.li@10.128.161.209:29418/mtk65
 FAIL TO PUSH IN [.]
 git pull --rebase
 
+git stash 保存当前工作区内容
+git stash pop 恢复工作区内容
+
 3) 将添加到暂存区的文件撤销
     git checkout branch_name -- file_name
     
