@@ -419,6 +419,11 @@ PR格式
 ===================================
 POP10独立APK编译
 
+===================================
+ubuntu下SourceInsight打开失败
+    删除%HOME/Soutce Insight/Settings下的所有文件
+    
+
 
 
 
