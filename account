@@ -39,6 +39,7 @@
 	﻿tcl-test tcl123456  
     mac 地址 58:12:53:52:6f:44
     tcl-excom abcd12345
+    FGFW tabelt10f
 
 10)MTK:
 	帐号：zmtang
@@ -89,8 +90,9 @@
 zhouyou.test@gmail.com
 mobile33
 
-scdtest@gmail.com
-ctrctest
+21）
+    scdtablet@gmail.com
+    ctrctest
 ======================================================
 SIM Card
 中国联通：
@@ -189,4 +191,13 @@ RGB色值网站
     http://color.newsky365.com/
 SVG图片
     http://www.w3.org/TR/SVG11/paths.html#PathData
+    
+====================================================
+使用外网登录teleweb方式:
+    Server选择EXT, Local
+    账号: TeleExtArchermind 
+    密码: YlcBj660
+    
+    
+    
 

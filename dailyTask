@@ -4269,21 +4269,89 @@ WelcomeActivity
   周五：2014-12-26
 	任务：
 	–---------------------------------------------------------------------------
-
+886057
         
 	疑难：
 	–---------------------------------------------------------------------------
   ==================================== 
-  周一：2014-10-13
+  周一：2014-12-29
 	任务：
 	–---------------------------------------------------------------------------
-    
+    PR:870681:[calendar]when creat event it can not add different reminder
+    布局文件：edit_event_1.xml
         
 	疑难：
 	–---------------------------------------------------------------------------
 	
   ==================================== 
-  周二：2014-10-14
+  周二：2014-12-30
+  PR: 883931 --POP10-- [GMS]It become black screen for a moment when first entry google apps
+    --> 需要优化app之间的优化，优化PMS
+  PR: 870681 --pop10-- [calendar]when creat event it can not add different reminder
+    -->布局文件：edit_event_1.xml
+    数据库表Calendar -- index = 21 -- maxReminders -- default = 5
+    EventInfoFragment -- EVENT_INDEX_MAX_REMINDERS = 16
+    
+    -->查看页面
+    布局：event_info.xml
+    ./src/com/android/calendar/EventInfoFragment.java:928:            mView = inflater.inflate(R.layout.event_info, container, false);
+    
+    
+  
+  
+  pr: 886824 --pop10-- [Launcher]System cann't load menu
+    Launcher -- 566
+01-06 02:22:39.588 D/WifiService(  821): releaseWifiLockLocked: WifiLock{NlpWifiLock type=2 binder=android.os.BinderProxy@12470697}
+01-06 02:22:39.589 I/PowerManagerService(  821): setBrightness mButtonLight 0.
+01-06 02:22:39.602 I/Timeline( 1482): Timeline: Activity_launch_request id:flipboard.app time:1919841
+01-06 02:22:39.603 I/ActivityManager(  821): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10008000 cmp=flipboard.app/flipboard.activities.FirstRunActivity} from uid 10138 on display 0
+01-06 02:22:39.603 W/ActivityManager(  821): Permission Denial: starting Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10008000 cmp=flipboard.app/flipboard.activities.FirstRunActivity } from ProcessRecord{3c3be13 1482:com.android.launcher3/u0a138} (pid=1482, uid=10138) not exported from uid 10178
+01-06 02:22:39.649 D/AndroidRuntime( 1482): Shutting down VM
+--------- beginning of crash
+01-06 02:22:39.688 E/AndroidRuntime( 1482): FATAL EXCEPTION: main
+01-06 02:22:39.688 E/AndroidRuntime( 1482): Process: com.android.launcher3, PID: 1482
+01-06 02:22:39.688 E/AndroidRuntime( 1482): java.lang.SecurityException: Permission Denial: starting Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10008000 cmp=flipboard.app/flipboard.activities.FirstRunActivity } from ProcessRecord{3c3be13 1482:com.android.launcher3/u0a138} (pid=1482, uid=10138) not exported from uid 10178
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at android.os.Parcel.readException(Parcel.java:1540)
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at android.os.Parcel.readException(Parcel.java:1493)
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at android.app.ActivityManagerProxy.startActivity(ActivityManagerNative.java:2404)
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at android.app.Instrumentation.execStartActivity(Instrumentation.java:1480)
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at android.app.Activity.startActivityForResult(Activity.java:3779)
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at android.app.Activity.startActivityForResult(Activity.java:3740)
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at com.android.launcher3.Launcher.startActivityForResult(Launcher.java:2127)
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at android.app.Activity.startActivity(Activity.java:4050)
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at android.app.Activity.startActivity(Activity.java:4018)
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at com.android.launcher3.Launcher$2.onShow(Launcher.java:566)
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at com.android.launcher3.Workspace.notifyPageSwitchListener(Workspace.java:1267)
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at com.android.launcher3.PagedView.computeScrollHelper(PagedView.java:766)
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at com.android.launcher3.PagedView.computeScroll(PagedView.java:794)
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at com.android.launcher3.SmoothPagedView.computeScroll(SmoothPagedView.java:166)
+01-06 02:22:39.688 E/AndroidRuntime( 1482): 	at com.android.launcher3.Workspace.computeScroll(Workspace.java:1495)
+  
+              public void onShow(boolean fromResume) {
+                if (fromResume) {
+                    mWorkspace.setCurrentPage(1);
+                    return;
+                }
+                //Added by Shuangli.liu for Smart News Panel custom --begin.
+                String appName = null;
+                try {
+                    appName = Settings.System.getString(getContentResolver(),  "app_select_name");
+                    if (appName == null || !appName.contains("/")) {
+                        startSearch(null, false, null, true);
+                    } else {
+                        Intent intent = new Intent(Intent.ACTION_MAIN, null);
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                        intent.addCategory(Intent.CATEGORY_LAUNCHER);
+                        intent.setClassName(appName.split("/")[0], appName.split("/")[1]);
+                        Launcher.this.startActivity(intent);
+                    }
+                 } catch (ActivityNotFoundException e) {
+                    Log.e(TAG, "Swip to left, could not find custom app:"+appName);
+                 }
+                //Added by Shuangli.liu for Smart News Panel custom --end.
+             }
+  
 	任务：
 	–---------------------------------------------------------------------------
 
@@ -4315,8 +4383,601 @@ WelcomeActivity
 	任务：
 	–---------------------------------------------------------------------------
 
+	疑难：
+	–---------------------------------------------------------------------------
+	
+  ==================================== 
+  周日：2015-01-04
+	任务：
+	–---------------------------------------------------------------------------
+	PR：890014 -- POP10 -- [Stability][Calendar]Add some events,the next time enter calendar all events disappeared
+	line -- 881
+12-31 06:05:24.449 E/TaskPersister(  841): Unable to open android.util.AtomicFile@3e0cd8f9 for persisting. java.io.IOException: write failed: ENOSPC (No space left on device)
+12-31 06:05:24.950 D/TaskPersister(  841): removeObsoleteFile: deleting file=379_task.xml
+12-31 06:05:24.950 D/TaskPersister(  841): removeObsoleteFile: deleting file=379_task_thumbnail.png
+12-31 06:05:26.764 I/ActivityManager(  841): START u0 {act=android.intent.action.VIEW cmp=com.android.calendar/.event.EditEventActivity (has extras)} from uid 10112 on display 0
+12-31 06:05:27.367 F/PackageManager(  841): Unable to write package manager user packages state,  current changes will be lost at reboot
+12-31 06:05:27.367 F/PackageManager(  841): java.io.IOException: write failed: ENOSPC (No space left on device)
+12-31 06:05:27.367 F/PackageManager(  841): 	at libcore.io.IoBridge.write(IoBridge.java:502)
+12-31 06:05:27.367 F/PackageManager(  841): 	at java.io.FileOutputStream.write(FileOutputStream.java:186)
+12-31 06:05:27.367 F/PackageManager(  841): 	at java.io.BufferedOutputStream.flushInternal(BufferedOutputStream.java:185)
+12-31 06:05:27.367 F/PackageManager(  841): 	at java.io.BufferedOutputStream.flush(BufferedOutputStream.java:85)
+12-31 06:05:27.367 F/PackageManager(  841): 	at com.android.internal.util.FastXmlSerializer.flush(FastXmlSerializer.java:254)
+12-31 06:05:27.367 F/PackageManager(  841): 	at com.android.internal.util.FastXmlSerializer.append(FastXmlSerializer.java:92)
+12-31 06:05:27.367 F/PackageManager(  841): 	at com.android.internal.util.FastXmlSerializer.appendIndent(FastXmlSerializer.java:127)
+12-31 06:05:27.367 F/PackageManager(  841): 	at com.android.internal.util.FastXmlSerializer.endTag(FastXmlSerializer.java:208)
+12-31 06:05:27.367 F/PackageManager(  841): 	at com.android.server.pm.Settings.writePackageRestrictionsLPr(Settings.java:1356)
+12-31 06:05:27.367 F/PackageManager(  841): 	at com.android.server.pm.PackageManagerService.setEnabledSetting(PackageManagerService.java:12207)
+12-31 06:05:27.367 F/PackageManager(  841): 	at com.android.server.pm.PackageManagerService.setComponentEnabledSetting(PackageManagerService.java:12115)
+12-31 06:05:27.367 F/PackageManager(  841): 	at android.content.pm.IPackageManager$Stub.onTransact(IPackageManager.java:1219)
+12-31 06:05:27.367 F/PackageManager(  841): 	at com.android.server.pm.PackageManagerService.onTransact(PackageManagerService.java:1876)
+12-31 06:05:27.367 F/PackageManager(  841): 	at android.os.Binder.execTransact(Binder.java:446)
+12-31 06:05:27.367 F/PackageManager(  841): Caused by: android.system.ErrnoException: write failed: ENOSPC (No space left on device)
+12-31 06:05:27.367 F/PackageManager(  841): 	at libcore.io.Posix.writeBytes(Native Method)
+12-31 06:05:27.367 F/PackageManager(  841): 	at libcore.io.Posix.write(Posix.java:223)
+12-31 06:05:27.367 F/PackageManager(  841): 	at libcore.io.BlockGuardOs.write(BlockGuardOs.java:313)
+12-31 06:05:27.367 F/PackageManager(  841): 	at libcore.io.IoBridge.write(IoBridge.java:497)
+12-31 06:05:27.367 F/PackageManager(  841): 	... 13 more
+12-31 06:05:27.402 E/DropBoxManagerService(  841): Can't write: system_server_wtf
+12-31 06:05:27.402 E/DropBoxManagerService(  841): java.io.IOException: write failed: ENOSPC (No space left on device)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at libcore.io.IoBridge.write(IoBridge.java:502)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at java.io.FileOutputStream.write(FileOutputStream.java:186)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at java.io.BufferedOutputStream.flushInternal(BufferedOutputStream.java:185)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at java.io.BufferedOutputStream.flush(BufferedOutputStream.java:85)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at java.io.FilterOutputStream.close(FilterOutputStream.java:61)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at java.io.BufferedOutputStream.close(BufferedOutputStream.java:152)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at com.android.server.DropBoxManagerService.add(DropBoxManagerService.java:230)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at android.os.DropBoxManager.addText(DropBoxManager.java:269)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at com.android.server.am.ActivityManagerService$20.run(ActivityManagerService.java:12062)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at com.android.server.am.ActivityManagerService.addErrorToDropBox(ActivityManagerService.java:12069)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at com.android.server.am.ActivityManagerService.handleApplicationWtfInner(ActivityManagerService.java:11882)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at com.android.server.am.ActivityManagerService$19.run(ActivityManagerService.java:11854)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at android.os.Handler.handleCallback(Handler.java:739)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at android.os.Handler.dispatchMessage(Handler.java:95)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at android.os.Looper.loop(Looper.java:135)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at android.os.HandlerThread.run(HandlerThread.java:61)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at com.android.server.ServiceThread.run(ServiceThread.java:46)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): Caused by: android.system.ErrnoException: write failed: ENOSPC (No space left on device)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at libcore.io.Posix.writeBytes(Native Method)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at libcore.io.Posix.write(Posix.java:223)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at libcore.io.BlockGuardOs.write(BlockGuardOs.java:313)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	at libcore.io.IoBridge.write(IoBridge.java:497)
+12-31 06:05:27.402 E/DropBoxManagerService(  841): 	... 16 more
+12-31 06:05:27.831 I/RILC    (  326): RIL_SOCKET_1 UNSOLICITED: UNSOL_SIGNAL_STRENGTH length:60
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+12-31 06:31:08.282 V/BackupManagerService(  841): Registering transport com.google.android.gms/.backup.BackupTransportService::com.google.android.gms/.backup.BackupTransportService = com.android.internal.backup.IBackupTransport$Stub$Proxy@3005f114
+12-31 06:31:08.309 E/ActivityThread( 1987): Service com.google.android.gms.backup.BackupTransportService has leaked ServiceConnection com.google.android.gms.http.f@14906d79 that was originally bound here
+12-31 06:31:08.309 E/ActivityThread( 1987): android.app.ServiceConnectionLeaked: Service com.google.android.gms.backup.BackupTransportService has leaked ServiceConnection com.google.android.gms.http.f@14906d79 that was originally bound here
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at android.app.LoadedApk$ServiceDispatcher.<init>(LoadedApk.java:1072)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at android.app.LoadedApk.getServiceDispatcher(LoadedApk.java:966)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at android.app.ContextImpl.bindServiceCommon(ContextImpl.java:1768)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at android.app.ContextImpl.bindService(ContextImpl.java:1751)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at android.content.ContextWrapper.bindService(ContextWrapper.java:538)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at com.google.android.gms.http.e.<init>(SourceFile:94)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at com.google.android.gms.http.GoogleHttpClient.<init>(SourceFile:234)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at com.google.android.gms.http.GoogleHttpClient.<init>(SourceFile:196)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at com.google.android.gms.backup.BackupTransportService.onCreate(SourceFile:1172)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at android.app.ActivityThread.handleCreateService(ActivityThread.java:2731)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at android.app.ActivityThread.access$1800(ActivityThread.java:144)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:1361)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at android.os.Handler.dispatchMessage(Handler.java:102)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at android.os.Looper.loop(Looper.java:135)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at android.app.ActivityThread.main(ActivityThread.java:5221)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at java.lang.reflect.Method.invoke(Native Method)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at java.lang.reflect.Method.invoke(Method.java:372)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at com.android.internal.os.ZygoteInit$MethodAndArgsCaller.run(ZygoteInit.java:898)
+12-31 06:31:08.309 E/ActivityThread( 1987): 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:693)
+12-31 06:31:08.755 W/ResourcesManager( 1618): Asset path '/system/framework/com.google.android.media.effects.jar' does not exist or contains no resources.
+12-31 06:31:08.768 W/ResourcesManager( 1618): Asset path '/system/framework/com.google.android.maps.jar' does not exist or contains no resources.
+12-31 06:31:08.800 W/ResourcesManager( 1618): Asset path '/system/framework/com.google.android.maps.jar' does not exist or contains no resources.
+12-31 06:31:09.023 E/AndroidRuntime(20331): FATAL EXCEPTION: ContactsProviderWorker
+12-31 06:31:09.023 E/AndroidRuntime(20331): Process: android.process.acore, PID: 20331
+12-31 06:31:09.023 E/AndroidRuntime(20331): android.database.sqlite.SQLiteFullException: database or disk is full (code 13)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.database.sqlite.SQLiteConnection.nativeExecute(Native Method)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.database.sqlite.SQLiteConnection.execute(SQLiteConnection.java:555)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.database.sqlite.SQLiteSession.endTransactionUnchecked(SQLiteSession.java:437)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.database.sqlite.SQLiteSession.endTransaction(SQLiteSession.java:401)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.database.sqlite.SQLiteDatabase.endTransaction(SQLiteDatabase.java:522)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at com.android.providers.contacts.ContactDirectoryManager.updateDirectoriesForPackage(ContactDirectoryManager.java:401)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at com.android.providers.contacts.ContactDirectoryManager.onPackageChanged(ContactDirectoryManager.java:350)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at com.android.providers.contacts.ContactsProvider2.performBackgroundTask(ContactsProvider2.java:1723)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at com.android.providers.contacts.ContactsProvider2$1.handleMessage(ContactsProvider2.java:1509)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.os.Handler.dispatchMessage(Handler.java:102)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.os.Looper.loop(Looper.java:135)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.os.HandlerThread.run(HandlerThread.java:61)
+12-31 06:31:09.046 I/ActivityManager(  841): Process android.process.acore (pid 20331) has died
+12-31 06:31:09.067 E/DropBoxManagerService(  841): Can't write: system_app_crash
+12-31 06:31:09.067 E/DropBoxManagerService(  841): java.io.IOException: write failed: ENOSPC (No space left on device)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): 	at libcore.io.IoBridge.write(IoBridge.java:502)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): 	at java.io.FileOutputStream.write(FileOutputStream.java:186)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): 	at java.io.BufferedOutputStream.flushInternal(BufferedOutputStream.java:185)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): 	at java.io.BufferedOutputStream.flush(BufferedOutputStream.java:85)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): 	at java.io.FilterOutputStream.close(FilterOutputStream.java:61)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): 	at java.io.BufferedOutputStream.close(BufferedOutputStream.java:152)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): 	at com.android.server.DropBoxManagerService.add(DropBoxManagerService.java:230)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): 	at android.os.DropBoxManager.addText(DropBoxManager.java:269)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): 	at com.android.server.am.ActivityManagerService$20.run(ActivityManagerService.java:12062)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): Caused by: android.system.ErrnoException: write failed: ENOSPC (No space left on device)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): 	at libcore.io.Posix.writeBytes(Native Method)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): 	at libcore.io.Posix.write(Posix.java:223)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): 	at libcore.io.BlockGuardOs.write(BlockGuardOs.java:313)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): 	at libcore.io.IoBridge.write(IoBridge.java:497)
+12-31 06:31:09.067 E/DropBoxManagerService(  841): 	... 8 more
+        
+        
+        
+        
+        
+        
+PR: 801000 -- [orange][settingss]It's failed to long press volume key to silence.
+圆形PR：800391
+    原生布局：./core/res/res/layout/volume_adjust_item.xml:67:        android:id="@+id/stream_icon"
+    圆形布局./core/res/res/layout/tct_volume_adjust_item.xml:53:            android:id="@+id/stream_icon"
+    控制文件：./core/java/android/view/VolumePanel.java
+    
+    父布局：./core/res/res/layout/volume_adjust.xml
+    ./base/core/java/android/view/VolumePanel.java:273:        View view = mView = inflater.inflate(R.layout.volume_adjust, null);
+
+
+
+        
         
 	疑难：
 	–---------------------------------------------------------------------------
+  ==================================== 
+  周一：2015-01-05
+	任务：
+	–---------------------------------------------------------------------------
+886614 -- [Chrome]Chrome would not doanload file when connects keyboard	
+887332 -- [VF] Input "qypgj" on which search of settings,display not beautiful	
+	
+880095 -- [Stability][PIM]create schedule in calendar show a notice page but email account has added to system	
+890014 -- [Stability][Calendar]Add some events,the next time enter calendar all events disappeared	
+891152 -- [Stability][Calendar]Test Calendar But ANR	
+
+
+882308 -- [VF][ACC2][13180][2 - Serious]Some unknown numbers displayed on DUT after opening the calendar event using Calendar option.	
+    同885273
+885273 -- [calendar]Mobile phone shared calendars via Bluetooth, after receiving the import calendar garbled	-- done
+            原生Calendar格式为 .ics格式
+            原生Calendar不支持 .vcs格式的日历
+            ./res/layout/agenda_item.xml:90:        android:id="@+id/selected_marker"
+            
+        ./res/layout/event_info.xml:63:            <include layout="@layout/event_info_headline" />
+        ./res/layout/event_info_headline.xml:19:    android:id="@+id/event_info_headline"
+
+        ./src/com/android/calendar/EventInfoFragment.java:1005:            event_info_dialog
+            TCLUtils.sendShareEvent()
+            
+        I/aidy    (  356): parseICalendar() -- line = PRODID:-//SyncCalendar//archermind//EN
+        I/aidy    (  356): parseICalendar() -- line = VERSION:2.0
+        I/aidy    (  356): parseICalendar() -- line = BEGIN:VTIMEZONE
+        I/aidy    (  356): parseICalendar() -- line = BEGIN:VEVENT
+        I/aidy    (  356): parseICalendar() -- line = END:VCALENDAR
+    
+    解决方案：根据传入的Uri判断传入的是哪中格式的文件，对于CVS格式的文件进行特殊的转换
+    
+891842 -- [VF][Spanish][Translate]Some string in calendar was not translated -- 转ying.zhou
+    EditEventFragment
+    EditEventView.java -- mTimezoneButton = (Button) view.findViewById(R.id.timezone_button);
+    EditEventView.showTimezoneDialog()
+    ./opt/timezonepicker/src/com/android/timezonepicker/TimeZonePickerDialog.java:28:public class TimeZonePickerDialog extends DialogFragment implements
+    
+888603 -- [Calendar]Import the event after recieve the calendar event, there has an useless string "/"
+转移字符：com.android.calendar:id/event_info_scroll_view
+
+打包成ICS文件过程：
+    EventInfoActivity --> updateShareURI()
+        -->SimpleIcsUtilities.createMeetingRequestFileForEventId() 
+        -->SimpleIcsUtilities.createMeetingRequestFile()  创建文件
+        加转义字符：SimpleIcsWriter-->writeTag()-->escapeTextValue()
+event展示界面：    
+./src/com/android/calendar/ics/IcsImportActivity.java:66:            bar.setTitle(getString(R.string.import_calendar));
+AgendarInfoFragment
+
+    
+    
+    pop8_lte  dev分支上的代码未被合入到orange版本中，导致orange版本验证失败
+        10. 代码未被合入到对应分支上
+	疑难：
+	–---------------------------------------------------------------------------
+	
+  ==================================== 
+  周二：2014-01-06
+	任务：
+	–---------------------------------------------------------------------------
+
+        
+	疑难：
+	–---------------------------------------------------------------------------
+	
+  ==================================== 
+  周三：2014-01-07
+	任务：
+	–---------------------------------------------------------------------------
+886614 -- [Chrome]Chrome would not doanload file when connects keyboard -- 
+这个问题Swiftkey已经复现，但是目前还改不了，Swiftkey的计划是在v5.3的版本上修正这个问题，预计在2015年3月左右。目前Swiftkey带有这个问题我们是否可以接受
+	
+880095 -- [Stability][PIM]create schedule in calendar show a notice page but email account has added to system -- 转yaoxiong.zhong
+    TAT测试 -- 必须先添加帐号才能添加agenda事件
+
+891286 -- [Stability][Calendar]Test Calendar,a page show
+    TAT测试 -- 弹出登录google帐号的界面 
+    
+891152 -- [Stability][Calendar]Test Calendar But ANR	-- 转chong.wang处理
+    TAT测试 -- 测试过程中logcat日志出现： ANR in com.google.process.location
+        
+890014 -- [Stability][Calendar]Add some events,the next time enter calendar all events disappeared -- 转chaohui.liu
+    TAT测试 -- 添加后的event事件消失
+    event查询
+        AgendaFragment.onResume()
+        
+最后一次出现 -- 3419
+12-31 06:31:09.023 E/AndroidRuntime(20331): FATAL EXCEPTION: ContactsProviderWorker
+12-31 06:31:09.023 E/AndroidRuntime(20331): Process: android.process.acore, PID: 20331
+12-31 06:31:09.023 E/AndroidRuntime(20331): android.database.sqlite.SQLiteFullException: database or disk is full (code 13)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.database.sqlite.SQLiteConnection.nativeExecute(Native Method)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.database.sqlite.SQLiteConnection.execute(SQLiteConnection.java:555)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.database.sqlite.SQLiteSession.endTransactionUnchecked(SQLiteSession.java:437)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.database.sqlite.SQLiteSession.endTransaction(SQLiteSession.java:401)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.database.sqlite.SQLiteDatabase.endTransaction(SQLiteDatabase.java:522)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at com.android.providers.contacts.ContactDirectoryManager.updateDirectoriesForPackage(ContactDirectoryManager.java:401)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at com.android.providers.contacts.ContactDirectoryManager.onPackageChanged(ContactDirectoryManager.java:350)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at com.android.providers.contacts.ContactsProvider2.performBackgroundTask(ContactsProvider2.java:1723)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at com.android.providers.contacts.ContactsProvider2$1.handleMessage(ContactsProvider2.java:1509)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.os.Handler.dispatchMessage(Handler.java:102)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.os.Looper.loop(Looper.java:135)
+12-31 06:31:09.023 E/AndroidRuntime(20331): 	at android.os.HandlerThread.run(HandlerThread.java:61)   
+        
+
+第一次出现 -- 9123
+12-31 06:36:03.413 W/ContentResolver( 2599): Failed to get type for: content://com.android.calendar (Unknown URL content://com.android.calendar)
+12-31 06:36:03.417 D/AlertReceiver( 2911): onReceive: a=android.intent.action.PROVIDER_CHANGED Intent
+    
+
+
+日历启动流程
+
+
+        
+	疑难：
+	–---------------------------------------------------------------------------
+	
+  ==================================== 
+  周四：2014-01-08
+	任务：
+	–---------------------------------------------------------------------------
+
+        
+
+	疑难：
+	–---------------------------------------------------------------------------
+	
+  ==================================== 
+  周五：2014-01-09
+	任务：
+	–---------------------------------------------------------------------------
+891286 -- [Stability][Calendar]Test Calendar,a page show
+    TAT测试 -- 弹出登录google帐号的界面 
+        
+	疑难：
+	–---------------------------------------------------------------------------
+	
+  ==================================== 
+  周一：2015-01-12
+	任务：
+	–---------------------------------------------------------------------------
+	1213
+D/PowerManagerService(  815): handleSandman: canDream=false, mWakefulness=Awake
+I/ActivityManager(  815): Force stopping com.jrdcom.launcher appid=10119 user=0: clear data
+I/ActivityManager(  815): Killing 1533:com.jrdcom.launcher/u0a119 (adj 5): stop com.jrdcom.launcher
+W/ActivityManager(  815): Scheduling restart of crashed service com.jrdcom.launcher/com.jrdcom.IdleService in 1000ms
+I/ActivityManager(  815):   Force finishing activity ActivityRecord{4214b390 u0 com.jrdcom.launcher/.Launcher t1}
+I/ActivityManager(  815):   Force stopping service ServiceRecord{41982180 u0 com.jrdcom.launcher/com.jrdcom.IdleService}
+        
+
+	疑难：
+	–---------------------------------------------------------------------------
+	
+	
+  ==================================== 
+  周二：2015-01-13
+	任务：
+	–---------------------------------------------------------------------------	
+	1、mat使用
+	
+	2、PR：891286 -- POP10 -- 进入Calendar跳转google登录界面（Calenar有帐号的情况下） -- 已转给tingting.gong继续monitor
+	
+	3、PR: 895780 -- POP10 -- 暂时不支持ISO-8859-5， windows-1251格式 -- 建议不改
+	
+	4、蘑菇街Android登录
+
+广播注册：IMServiceHelper.IMBroadcastReceiver
+接受处理：LoginActivity.onAction()
+发送处理：IMLoginManager.onLoginOk() <-- onRepMsgServerLogin()
+ <-- IMPacketDispatcher.dispatch()
+
+
+
+ LoginActivity.onCreate() --> attemptLogin()
+ IMLoginManager.login() --> connectLoginServer()
+ imlib/IMLoginManager.java:232:                            loginServerThread = new SocketThread(ip, port, new LoginServerHandler());
+ imlib/network/LoginServerHandler.messageReceived()        IMPacketDispatcher.dispatch((ChannelBuffer) e.getMessage());
+ IMPacketDispatcher.dispatch()                             IMLoginManager.instance().onRepMsgServerLogin(buffer);
+ IMLoginManager.onRepMsgServerLogin()                      onLoginOk() --> 发送广播ACTION_LOGIN_RESULT
+ IMServiceHelper.onReceiver()                              OnIMServiceListner.onAction(action, intent, this);
+ LoginActivity implements OnIMServiceListner               onAction()处理登录结果
+	
+	疑难：
+	–---------------------------------------------------------------------------
+
+  ==================================== 
+  周三：2015-01-14
+	任务：
+	–---------------------------------------------------------------------------	
+	
+	
+	疑难：
+	–---------------------------------------------------------------------------
+	
+  ==================================== 
+  周一：2015-01-19
+	任务：
+	–---------------------------------------------------------------------------	
+	1、修改manpower -- 高美误操作 -- done
+	2、填写本月的epas
+	3、PR：886824 -- POP10 -- [Launcher]System cann't load menu
+	
+	4、PR：901853 -- POP10 -- [Setup wizard]Choose language interface doesn't remove emergency call icon in no call version
+紧急通话按钮
+id == com.google.android.setupwizard:id/welcome_emergency_dial
+/data/nishome/tdsw1/mingxiao.li/projects/qcom/pop10_vf/frameworks/base/core/res/isdm_framework-res.plf
+/data/nishome/tdsw1/mingxiao.li/projects/qcom/pop10_vf/frameworks/base/core/res/res/values
+    <!--bool name="config_voice_capable">true</bool-->
+    
+反编译代码
+WelcomeActivity
+    private void initViews() {
+        if (isPrimaryUser()) {
+              this.mLanguagePicker.setOnLanguageSelectedListener(new WelcomeActivity.6(this));
+              updateAvailableLocales();
+              this.mEmergencyCallButton = ((Button)findViewById(2131624039));
+              
+              if (!getResources().getBoolean(17956931))
+                break label185;
+              this.mEmergencyCallButton.setOnClickListener(this);
+        }
+        while (true) {
+              updateContentView();
+              return;
+              this.mLanguagePicker.setVisibility(8);
+              break;
+              label185: this.mEmergencyCallButton.setVisibility(8);
+        }
+  }
+
+十进制：17956931 --> 十六进制：0x01120043
+12月24号 -- 取值
+./out/target/common/obj/APPS/framework-res_intermediates/public_resources.xml:166813:  
+        <public type="bool" name="config_bluetooth_wide_band_speech" id="0x01120043" />
+        
+./out/target/perso/pop10/jrdResAssetsCust/frameworks/base/core/res/res/values/config.xml:1004:    
+        <bool name="config_bluetooth_wide_band_speech">true</bool>
+    
+./frameworks/base/core/res/res/values/config.xml:1004:    
+        <bool name="config_bluetooth_wide_band_speech">true</bool>   
+	
+1月7号 -- 最新值
+./out/target/common/obj/APPS/framework-res_intermediates/public_resources.xml:168769:
+        <public type="bool" name="config_bluetooth_sco_off_call" id="0x01120043" />
+
+修改：
+framework/base/core/res/res/values/public.xml
+   <public type="bool" name="config_voice_capable" id="0x01120043" />
+   
+   
+   5、JAVA NIO框架mina, netty
+   
+   6、PMS
+1) 获取App简单信息
+        // 获取简单信息
+        PackageParser.Package parsed = PackageUtil.getPackageInfo(sourceFile);
+        // 简单的赋值过程，将PackageParser.Package中的值赋给对应的PackageInfo
+        PackageInfo mPkgInfo = PackageParser.generatePackageInfo(parsed, null, PackageManager.GET_PERMISSIONS, 0, 0, null, new PackageUserState());
+
+PackageUtil：
+        public static PackageParser.Package getPackageInfo(File sourceFile) {
+            final PackageParser parser = new PackageParser();
+            // 解析apk包，此处不进行签名验证，签名验证需要在PackageParser.collectCertificates()中独立进行
+            PackageParser.Package pkg = parser.parseMonolithicPackage(sourceFile, 0);
+            // 检测AndroidManifest是否正确
+            parser.collectManifestDigest(pkg);
+            return pkg;
+        }
+PackageParser：
+        public Package parseMonolithicPackage(File apkFile, int flags) throws PackageParserException {
+            // 1）判断是否处于加密模式下，在加密模式下，只考虑核心App的安装，AndroidManifest.xml中设置coreApp="true"
+            if (mOnlyCoreApps) {
+                final PackageLite lite = parseMonolithicPackageLite(apkFile, flags);
+                if (!lite.coreApp) {
+                    throw new PackageParserException(INSTALL_PARSE_FAILED_MANIFEST_MALFORMED, "Not a coreApp: " + apkFile);
+                }
+            }
+            final AssetManager assets = new AssetManager();
+            try {
+            // 2）解析apk包，获取基本信息
+                final Package pkg = parseBaseApk(apkFile, assets, flags);
+                pkg.codePath = apkFile.getAbsolutePath();
+                return pkg;
+            } finally {
+                IoUtils.closeQuietly(assets);
+            }
+        }
+1）补充 -- 加密：
+    http://blog.csdn.net/longyc2010/article/details/41050669
+    加密方式：设置 -->安全 -->加密平板/手机
+    加密App：在AndroidManifest.xml中设置coreApp="true"
+    已知的核心App：framework-res.apk, InputDevice.apk, SystemUI.apk, Keyguard.apk, Settings.apk, LatinIME.apk, 
+    Shell.apk, Dialer.apk, TelephonyProvider.apk, TeleService.apk等
+    当在onlyCore的模式下，非coreApp直接设置状态为已经解析完毕，然后返回null，表示该apk中没有解析出内容。
+    因此，在加密后，进入解锁界面的时候，仅仅有部分应用是可用的。
+
+2）解析apk包，获取基本信息
+PackageParser.java:
+    private Package parseBaseApk(File apkFile, AssetManager assets, int flags) throws PackageParserException {
+        final String apkPath = apkFile.getAbsolutePath();
+        mParseError = PackageManager.INSTALL_SUCCEEDED;
+        mArchiveSourcePath = apkFile.getAbsolutePath();
+        
+        // 2.1) 将Apk中的资源添加到AssetManager中，如果已存在则直接返回对应的cookie，失败返回0
+        final int cookie = loadApkIntoAssetManager(assets, apkPath, flags);
+        Resources res = null;
+        XmlResourceParser parser = null;
+        try {
+            res = new Resources(assets, mMetrics, null);
+            assets.setConfiguration(0, 0, null, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Build.VERSION.RESOURCES_SDK_INT);
+            // 2.2）恢复打包的xml文件
+            parser = assets.openXmlResourceParser(cookie, ANDROID_MANIFEST_FILENAME);
+            final String[] outError = new String[1];
+            // 2.3）解析apk，获取Package信息
+            final Package pkg = parseBaseApk(res, parser, flags, outError);
+            if (pkg == null) {
+                throw new PackageParserException(mParseError, apkPath + " (at " + parser.getPositionDescription() + "): " + outError[0]);
+            }
+            pkg.baseCodePath = apkPath;
+            // 不对签名信息进行处理，直接赋值null
+            pkg.mSignatures = null;
+            return pkg;
+        } catch (PackageParserException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new PackageParserException(INSTALL_PARSE_FAILED_UNEXPECTED_EXCEPTION, "Failed to read manifest from " + apkPath, e);
+        } finally {
+            IoUtils.closeQuietly(parser);
+        }
+    }
+
+2.1) 将Apk添加到AssetManager中
+PackageParser.loadApkIntoAssetManager() --> AssetManager.addAssetPathNative(path)
+        --> base/core/jni/android_util_AssetManager.cpp -->android_content_AssetManager_addAssetPath()
+        --> base/libs/androidfw/AssetManager.cpp -->addAssetPath()
+                bool AssetManager::addAssetPath(const String8& path, int32_t* cookie)
+                {
+                    AutoMutex _l(mLock);
+                    asset_path ap;
+                    String8 realPath(path);
+                    if (kAppZipName) {
+                        realPath.appendPath(kAppZipName);
+                    }
+                    ap.type = ::getFileType(realPath.string());
+                    if (ap.type == kFileTypeRegular) {
+                        ap.path = realPath;
+                    } else {
+                        ap.path = path;
+                        ap.type = ::getFileType(path.string());
+                        if (ap.type != kFileTypeDirectory && ap.type != kFileTypeRegular) {
+                            ALOGW("Asset path %s is neither a directory nor file (type=%d).",
+                                 path.string(), (int)ap.type);
+                            return false;
+                        }
+                    }
+
+                    // 如果已存在则直接跳过
+                    for (size_t i=0; i<mAssetPaths.size(); i++) {
+                        if (mAssetPaths[i].path == ap.path) {
+                            if (cookie) {
+                                *cookie = static_cast<int32_t>(i+1);
+                            }
+                            return true;
+                        }
+                    }
+
+                    // 检查路径中是否存在AndroidManifest.xml
+                    Asset* manifestAsset = const_cast<AssetManager*>(this)->openNonAssetInPathLocked(
+                            kAndroidManifest, Asset::ACCESS_BUFFER, ap);
+                    if (manifestAsset == NULL) {
+                        // This asset path does not contain any resources.
+                        delete manifestAsset;
+                        return false;
+                    }
+                    delete manifestAsset;
+                    // 保存Apk路径 Vector<asset_path> mAssetPaths;
+                    // struct asset_path {
+                    //      String8 path;
+                    //      FileType type;
+                    //      String8 idmap;
+                    //  };
+                    mAssetPaths.add(ap);
+                    if (mResources != NULL) {
+                        size_t index = mAssetPaths.size() - 1;
+                        appendPathToResTable(ap, &index);
+                    }
+
+                    // new paths are always added at the end
+                    // cookie中保存对应的下标
+                    if (cookie) {
+                        *cookie = static_cast<int32_t>(mAssetPaths.size());
+                    }
+
+                #ifdef HAVE_ANDROID_OS
+                    // Load overlays, if any
+                    asset_path oap;
+                    for (size_t idx = 0; mZipSet.getOverlay(ap.path, idx, &oap); idx++) {
+                        mAssetPaths.add(oap);
+                    }
+                #endif
+
+                    return true;
+                }
+2.2）恢复打包的xml文件
+AssetManager.java
+    public final XmlResourceParser openXmlResourceParser(int cookie, String fileName) throws IOException {
+        XmlBlock block = openXmlBlockAsset(cookie, fileName);
+        XmlResourceParser rp = block.newParser();
+        block.close();
+        return rp;
+    }
+base/core/jni/android_util_AssetManager.cpp
+    static jlong android_content_AssetManager_openXmlAssetNative(JNIEnv* env, jobject clazz, jint cookie, jstring fileName){
+        return reinterpret_cast<jlong>(block);
+    }
+
+2.3）解析apk，获取Package信息
+PackageParser.java
+
+	疑难：
+	–---------------------------------------------------------------------------
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
