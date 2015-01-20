@@ -423,6 +423,37 @@ POP10独立APK编译
 ubuntu下SourceInsight打开失败
     删除%HOME/Soutce Insight/Settings下的所有文件
     
+    
+===================================
+EPas填写
+1）软件开发效率 30%
+        平均每天解决PR/CE/FR的数量，PR/CR/FR停留的时间
+ 	    Duration	 	停留时间<=2 days
+        Quality	 	    每日解决数量>=1
+2）代码提交质量  20%
+        修改被拒 绝的数量＋修改带来衰退的数量
+     	Quality	 	<= 1/month
+3）学习提高  30%
+        学习AMS + PowerManagerService
+        Duration	 	>= 25 days
+ 
+ ===================================
+ 打印时间
+    private static long preTime = 0;
+    private static long allTime  = 0;
+    public static void printTime(String msg) {
+        long dTime = System.currentTimeMillis() - preTime;
+        allTime += dTime;
+        if(msg.startsWith("onPause() -- begin")) {
+            dTime = 0;
+            allTime = 0;
+        }
+        android.util.Log.i("aidy", msg + " -- dTime = " + dTime + " -- allTime = " + allTime + " -- current = " + System.currentTimeMillis());
+        preTime = System.currentTimeMillis();
+    }	 	 	 	 	 
+
+ 	 	  	 	 	 	 	 	 	 
+
 
 
 
