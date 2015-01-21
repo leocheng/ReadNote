@@ -14,6 +14,51 @@
     13、进程间通信--binder
     14、泛型类设计
 
+
+
+
+系统启动
+启动->init.c: main()
+init.c->init_parser.c: init_parse_config_file("/init.rc")
+init_parser.c->init_parser.c: read_file()
+init_parser.c->init_parser.c: parse_config()
+init_parser.c->init_parser.c: parse_new_section()
+init.c->init.c: action_for_each_trigger("boot", …)
+init.c->init.c: queue_builtin_action()
+init.c->builtins.c: do_class_start()
+builtins.c->init_parser.c: service_for_each_class()
+init_parser.c->builtins.c: service_start_if_not_disabled()
+builtins.c->init.c: service_start():通过fork() execve()新建进程
+init.c->App_main.cpp: main()：创建zygote进程，修改进程名为"zygote"
+App_main.cpp->AndroidRuntime.cpp: start()
+AndroidRuntime.cpp->AndroidRuntime.cpp:startVM():创建VM
+AndroidRuntime.cpp->AndroidRuntime.cpp:startReg()：注册JNI函数
+AndroidRuntime.cpp->ZygoteInit.java:main()
+ZygoteInit.java->ZygoteInit.java: registerZygoteSocket()
+ZygoteInit.java->ZygoteInit.java: gc()
+ZygoteInit.java->Zygote.java: startSystemServer()
+Zygote.java->Zygote.java:forkSystemServer()
+Zygote.java->dalvik_system_zygote.cpp:Dalvik_dalvik_system_Zygote_forkSystemServer()
+ZygoteInit.java->ZygoteInit.java:handleSystemServerProcess()
+ZygoteInit.java->RuntimeInit.java:zygoteInit()
+RuntimeInit.java->RuntimeInit.java:redirectLogStreams()
+RuntimeInit.java->RuntimeInit.java:commonInit()
+RuntimeInit.java->RuntimeInit.java:nativeZygoteInit()
+RuntimeInit.java->RuntimeInit.java:applicationInit()
+RuntimeInit.java->ZygoteInit.java: 抛出异常MethodAndArgsCaller，在main()方法中捕获
+ZygoteInit.java->SystemServer.java: main()
+
+
+SystemServer.java->com_android_server_SystemServer.cpp:android_server_SystemServer_nativeInit()
+SystemServer.java->SystemServer$ServerThread.java:initAndLoop()
+SystemServer$ServerThread.java->Looper.java:prepareMainLooper()
+SystemServer$ServerThread.java->ServiceManager.java:addService()
+SystemServer$ServerThread.java->Looper.java:loop()
+
+
+ZygoteInit.java->ZygoteInit.java: runSelectLoop() 死循环，等待请求创建App
+ZygoteInit.java->ZygoteInit.java: closeServerSocket()
+
 ====================================
 疑难
     1、Android系统是如何通过一个AndroidManifest.xml关联所有的组建的

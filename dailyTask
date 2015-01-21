@@ -4791,6 +4791,7 @@ framework/base/core/res/res/values/public.xml
    5、JAVA NIO框架mina, netty
    
    6、PMS
+
 1) 获取App简单信息
         // 获取简单信息
         PackageParser.Package parsed = PackageUtil.getPackageInfo(sourceFile);
