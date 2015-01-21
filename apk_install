@@ -1,24 +1,41 @@
 
 一、apk 安装方式
-	1）系统启动是安装
+	1）系统启动时安装 -- 启动时扫描所有apk文件，从新安装
 	2）adb安装
 	3）通过packageInstaller安装
 	4）google市场
 
 不管是哪种安装方式，最后都殊途同归，由PackageManagerService进行统一的apk安装
 
-PackageInstaller:
-    PackageInstallerActivity：
+以PackageInstaller为例，它主要包括两个过程，
+    1）是通过PackageParser解析apk包，获取app的简要信息，用于安装过程中的显示，比如应用名称、icon，需要哪些权限等等。
+    2）调用PackageManager在后台进行安装
+1）PackageInstallerActivity：
     protected void onCreate(Bundle icicle) {
-        … ...
+        ...
         final File sourceFile = new File(mPackageURI.getPath());
         // 获取App的简单信息
         PackageParser.Package parsed = PackageUtil.getPackageInfo(sourceFile);
         // 简单的赋值过程，将PackageParser.Package中的值赋给对应的PackageInfo
         mPkgInfo = PackageParser.generatePackageInfo(parsed, null, PackageManager.GET_PERMISSIONS, 0, 0, null, new PackageUserState());
-        … ...
+        ...
     }
-==================================
+
+2）安装过程
+InstallAppProgress：
+    public void onCreate(Bundle icicle) {
+        Intent intent = getIntent();
+        // 类型：ApplicationInfo
+        mAppInfo = intent.getParcelableExtra(PackageUtil.INTENT_ATTR_APPLICATION_INFO);
+        mInstallFlowAnalytics = intent.getParcelableExtra(EXTRA_INSTALL_FLOW_ANALYTICS);
+        mPackageURI = intent.getData();
+        ... …
+        PackageManager pm = getPackageManager();
+        PackageInstallObserver observer = new PackageInstallObserver();
+        pm.installPackageWithVerificationAndEncryption(mPackageURI, observer, installFlags,
+                    installerPackageName, verificationParams, null);
+    }
+=============== 过程一 ===================
 获取App简单信息
 PackageUtil：
         public static PackageParser.Package getPackageInfo(File sourceFile) {
@@ -49,16 +66,27 @@ PackageParser：
                 IoUtils.closeQuietly(assets);
             }
         }
-1）补充 -- 加密：
+1）补充 -- PackageParser
+    它定已了许多内部类：Package,PackageLite, Activity, Service, Provider, Permission... ...
+    其中Activity，Service等类对应到四大组件中的信息
+    Package主要用来保存AndroidManifest.xml中的信息
+    主要成员变量：
+        activitys: ArrayList<Ativity>
+        services: ArrayList<Service>
+        ...
+    PackageLite是一个轻量级的数据结构，仅保存了应用名称、安装位置等简要信息，在后面DefaultContainerService.getMinimalPackageInfo()中获取合适的安装位置时会用到
+
+2）补充 -- 加密：
     http://blog.csdn.net/longyc2010/article/details/41050669
     加密手机/平板：设置 -->安全 -->加密
     加密App：在AndroidManifest.xml中设置coreApp="true"
     已知的核心App：framework-res.apk, InputDevice.apk, SystemUI.apk, Keyguard.apk, Settings.apk, LatinIME.apk, 
     Shell.apk, Dialer.apk, TelephonyProvider.apk, TeleService.apk等
-    当在onlyCore的模式下，非coreApp直接设置状态为已经解析完毕，然后返回null，表示该apk中没有解析出内容。
-    因此，在加密后，进入解锁界面的时候，仅仅有部分应用是可用的。
+    当在onlyCore的模式下，系统启动时，非coreApp直接设置状态为已经解析完毕，然后返回null，表示该apk中没有解析出内容。
+    因此，在加密后，仅仅有部分应用是可用的。
 
 2）解析apk包，获取基本信息
+    主要是将apk进行解压缩，然后进行文件读取操作
 PackageParser.java:
     private Package parseBaseApk(File apkFile, AssetManager assets, int flags) throws PackageParserException {
         final String apkPath = apkFile.getAbsolutePath();
@@ -73,10 +101,12 @@ PackageParser.java:
         try {
             res = new Resources(assets, mMetrics, null);
             assets.setConfiguration(0, 0, null, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Build.VERSION.RESOURCES_SDK_INT);
-            // 2.2）将apk中的AndroidManifest.xml文件恢复
+
+            // 2.2）将apk中的AndroidManifest.xml文件恢复，获取该xml文件
             parser = assets.openXmlResourceParser(cookie, ANDROID_MANIFEST_FILENAME);
             final String[] outError = new String[1];
-            // 2.3）解析apk，获取Package信息
+
+            // 2.3）解析apk，获取Package信息，主要是解析AndroidMenifest.xml文件，然后将xml中的数据保存到Package的数据结构中
             final Package pkg = parseBaseApk(res, parser, flags, outError);
             if (pkg == null) {
                 throw new PackageParserException(mParseError, apkPath + " (at " + parser.getPositionDescription() + "): " + outError[0]);
@@ -156,7 +186,7 @@ PackageParser.loadApkIntoAssetManager()
                     }
                     return true;
                 }
-2.2）将apk中的AndroidManifest.xml文件恢复
+2.2）将apk中的 AndroidManifest.xml文件恢复，并解析AndroidMenifest.xml文件，将数据节点保存在 XmlResourceParser 中
 AssetManager.java
     public final XmlResourceParser openXmlResourceParser(int cookie, String fileName) throws IOException {
         XmlBlock block = openXmlBlockAsset(cookie, fileName);
@@ -233,7 +263,7 @@ Asset* AssetManager::openNonAssetInPathLocked(const char* fileName, AccessMode m
         return pAsset;
     }
 
-Asset.cpp官方说明：
+补充3）Asset.cpp官方说明：
     /*
      * Instances of this class provide read-only operations on a byte stream.
      *
@@ -359,23 +389,14 @@ PackageParser.java
                 PARSE_DEFAULT_INSTALL_LOCATION);
         pkg.applicationInfo.installLocation = pkg.installLocation;
 
-        /* Set the global "forward lock" flag */
-        if ((flags & PARSE_FORWARD_LOCK) != 0) {
-            pkg.applicationInfo.flags |= ApplicationInfo.FLAG_FORWARD_LOCK;
-        }
-
-        /* Set the global "on SD card" flag */
-        if ((flags & PARSE_ON_SDCARD) != 0) {
-            pkg.applicationInfo.flags |= ApplicationInfo.FLAG_EXTERNAL_STORAGE;
-        }
-        
+        ... ...
         int outerDepth = parser.getDepth();
         while ((type = parser.next()) != XmlPullParser.END_DOCUMENT
                 && (type != XmlPullParser.END_TAG || parser.getDepth() > outerDepth)) {
             if (type == XmlPullParser.END_TAG || type == XmlPullParser.TEXT) {
                 continue;
             }
-
+// 解析各个节点
             String tagName = parser.getName();
             // 解析Application属性
             if (tagName.equals("application")) {
@@ -419,7 +440,7 @@ PackageParser.java
     }
 
     以parseApplication为例
-    
+PackageParser.java
     private boolean parseApplication(Package owner, Resources res, XmlPullParser parser, AttributeSet attrs, int flags, String[] outError) throws XmlPullParserException, IOException {
             ... ...
             while ((type = parser.next()) != XmlPullParser.END_DOCUMENT
@@ -430,13 +451,12 @@ PackageParser.java
 
                 String tagName = parser.getName();
                 if (tagName.equals("activity")) {
-                    Activity a = parseActivity(owner, res, parser, attrs, flags, outError, false,
-                            hardwareAccelerated);
+                    Activity a = parseActivity(owner, res, parser, attrs, flags, outError, false, hardwareAccelerated);
                     if (a == null) {
                         mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
                         return false;
                     }
-
+                    // 保存Activity
                     owner.activities.add(a);
 
                 } else if (tagName.equals("receiver")) {
@@ -445,7 +465,6 @@ PackageParser.java
                         mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
                         return false;
                     }
-
                     owner.receivers.add(a);
 
                 } else if (tagName.equals("service")) {
@@ -454,7 +473,6 @@ PackageParser.java
                         mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
                         return false;
                     }
-
                     owner.services.add(s);
 
                 } else if (tagName.equals("provider")) {
@@ -463,7 +481,6 @@ PackageParser.java
                         mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
                         return false;
                     }
-
                     owner.providers.add(p);
 
                 }
@@ -473,8 +490,8 @@ PackageParser.java
             return true;
         }
 
-==================================================
-3、安装过程
+=================== 过程二 ===============================
+安装过程
 InstallAppProgress：
     public void onCreate(Bundle icicle) {
         Intent intent = getIntent();
@@ -483,47 +500,48 @@ InstallAppProgress：
         mInstallFlowAnalytics = intent.getParcelableExtra(EXTRA_INSTALL_FLOW_ANALYTICS);
         mPackageURI = intent.getData();
         ... …
+
         PackageManager pm = getPackageManager();
         PackageInstallObserver observer = new PackageInstallObserver();
         pm.installPackageWithVerificationAndEncryption(mPackageURI, observer, installFlags,
                     installerPackageName, verificationParams, null);
     }
 
-3.1）PackageManager 与 PackageManagerService 关系
-ContextImpl:
-    public PackageManager getPackageManager() {
-        IPackageManager pm = ActivityThread.getPackageManager();
-        if (pm != null) {
-            return (mPackageManager = new ApplicationPackageManager(this, pm));
+4）补充 -- PackageManager 与 PackageManagerService 关系
+    从Actvity中获取的PackageManager其实是ApplicationPackageManager.
+    ContextImpl:
+        public PackageManager getPackageManager() {
+            IPackageManager pm = ActivityThread.getPackageManager();
+            if (pm != null) {
+                return (mPackageManager = new ApplicationPackageManager(this, pm));
+            }
         }
-    }
 
-ApplicationManager:
-    ApplicationPackageManager(ContextImpl context, IPackageManager pm) {
-        mContext = context;
-        mPM = pm;
-    }
-    public PackageInfo getPackageInfo(String packageName, int flags) throws NameNotFoundException {
-            PackageInfo pi = mPM.getPackageInfo(packageName, flags, mContext.getUserId());
-    }
-    public void installPackageWithVerificationAndEncryption(Uri packageURI, …)  {
-        try {
-            mPM.installPackageWithVerificationAndEncryption(packageURI, observer, flags,
-                    installerPackageName, verificationParams, encryptionParams);
-        } catch (RemoteException e) {
-            // Should never happen!
+    而ApplicationManager中的安装操作只是对IPackageManager进行了一个封装
+    ApplicationManager:
+        ApplicationPackageManager(ContextImpl context, IPackageManager pm) {
+            mContext = context;
+            mPM = pm;
         }
-    }
+        public PackageInfo getPackageInfo(String packageName, int flags) throws NameNotFoundException {
+                PackageInfo pi = mPM.getPackageInfo(packageName, flags, mContext.getUserId());
+        }
+        public void installPackageWithVerificationAndEncryption(Uri packageURI, …)  {
+            try {
+                mPM.installPackageWithVerificationAndEncryption(packageURI, observer, flags, installerPackageName, verificationParams, encryptionParams);
+            } catch (RemoteException e) {
+                // Should never happen!
+            }
+        }
 
-ActivityThread:
-    public static IPackageManager getPackageManager() {
-        IBinder b = ServiceManager.getService("package");
-        sPackageManager = IPackageManager.Stub.asInterface(b);
-        return sPackageManager;
-    }
-
-而PackageManagerService extends IpackageManager.Stub ，IpackageManager通过IPackageManager.Stub.Proxy中的IBinder与PMS进行通信
-因此上述InstallAppProgress的安装动作实际是由PackageManagerService来执行的
+    而PackageManagerService extends IpackageManager.Stub ，IpackageManager通过IPackageManager.Stub.Proxy中的IBinder与PMS进行通信
+    因此上述InstallAppProgress的安装动作实际是由PackageManagerService来执行的
+    ActivityThread:
+        public static IPackageManager getPackageManager() {
+            IBinder b = ServiceManager.getService("package");
+            sPackageManager = IPackageManager.Stub.asInterface(b);
+            return sPackageManager;
+        }
 
 3.2）PackageManagerService：
     public void installPackageWithVerificationAndEncryption(
@@ -533,7 +551,7 @@ ActivityThread:
             String installerPackageName,
             VerificationParams verificationParams, 
             ContainerEncryptionParams encryptionParams) {  
-        … …
+        ... ...
         // 发送一个Message由内部的PackageHandler处理，注意传递的obj对象是InstallParams
         final Message msg = mHandler.obtainMessage(INIT_COPY);
         msg.obj = new InstallParams(packageURI, observer, filteredFlags, installerPackageName, verificationParams, encryptionParams, user);
@@ -541,7 +559,8 @@ ActivityThread:
     }
 
 /**
-* 在PMS的构造函数中初始化，mHandler = new PackageHandler(mHandlerThread.getLooper());其中HandlerThread是另外一个线程，因此，mHandler是被帮定到mHandlerThread这个线程中的。
+* 在PMS的构造函数中初始化，mHandler = new PackageHandler(mHandlerThread.getLooper());
+* 其中HandlerThread是另外一个线程，因此，mHandler是被帮定到mHandlerThread这个线程中的。
 */
 PackageManagerService$PackageHandler : 
         void doHandleMessage(Message msg) {
@@ -550,11 +569,13 @@ PackageManagerService$PackageHandler :
                     // 构造一个队列，将任务保存在ArrayList<HandlerParams> mPendingInstalls中
                     HandlerParams params = (HandlerParams) msg.obj;
                     int idx = mPendingInstalls.size();
-                    if (!mBound) {
+                    if (!mBound) {// 是否与DefaultContainerService建立了连接
+                        // 与DefaultContainerService建立连接，此过程中会将mBound置为true
                         if (!connectToService()) {
                             params.serviceError();
                             return;
                         } else {
+                            // 添加任务
                             mPendingInstalls.add(idx, params);
                         }
                     } else {
@@ -566,6 +587,7 @@ PackageManagerService$PackageHandler :
                     break;
                 }
                 case MCS_BOUND: {
+                        // 取处队列中的第一个任务
                         HandlerParams params = mPendingInstalls.get(0);
                         if (params != null) { 
                            // 3.3) 开始安装
@@ -574,6 +596,7 @@ PackageManagerService$PackageHandler :
                                 if (mPendingInstalls.size() > 0) {
                                     mPendingInstalls.remove(0);
                                 }
+                                // 如果当前没有任务了，且与DCS建立连接，发送消息断开该连接
                                 if (mPendingInstalls.size() == 0) {
                                     if (mBound) {
                                         removeMessages(MCS_UNBIND);
@@ -599,7 +622,7 @@ PackageManagerService$HandlerParams :
                     handleServiceError();
                     return false;
                 } else {
-                    // 3.3.1）处理安装操作
+                    // 3.3.1）处理安装操作（由子类InstallParams执行具体的操作）
                     handleStartCopy();
                     res = true;
                 } 
@@ -625,7 +648,7 @@ PackageManagerService$InstallParams :继承至 HandlerParams
                 … …
                 packageFile = mTempPackage;
                 if (packageFile != null) {
-                        // 2）通过IMediaContainerService得一个PackageInfoLite对象，其实现了Parcelable接口，可通过Binder在进程间传递
+                        // 2）通过DefaultContainerService得一个PackageInfoLite对象，其实现了Parcelable接口，可通过Binder在进程间传递
                         // PackageInfoLite中的recommendedInstallLocation会获取合适的安装位置
                         final String packageFilePath = packageFile.getAbsolutePath();
                         pkgLite = mContainerService.getMinimalPackageInfo(packageFilePath, flags,
@@ -653,13 +676,14 @@ PackageManagerService$InstallParams :继承至 HandlerParams
                   }
             }
         }
-补充：Serializable和Parcelable比较
-        Serializable的作用是为了保存对象的属性到本地文件、数据库、网络流、rmi以方便数据传输，当然这种传输可以是程序内的也可以是两个程序间的。而Android的Parcelable的设计初衷是因为Serializable效率过慢，为了在程序内不同组件间以及不同Android程序间(AIDL)高效的传输数据而设计，这些数据仅在内存中存在，Parcelable是通过IBinder通信的消息的载体。
-        Parcelable的性能比Serializable好，在内存开销方面较小，所以在内存间数据传输时推荐使用Parcelable，如activity间传输数据，而Serializable可将数据持久化方便保存，所以在需要保存或网络传输数据时选择Serializable，因为android不同版本Parcelable可能不同，所以不推荐使用Parcelable进行数据持久化
-        Serializable序列化不保存静态变量，可以使用Transient关键字对部分字段不进行序列化，也可以覆盖writeObject、readObject方法以实现序列化过程自定义
-1.在使用内存的时候，Parcelable 类比Serializable性能高，所以推荐使用Parcelable类。
-2.Serializable在序列化的时候会产生大量的临时变量，从而引起频繁的GC。
-3.Parcelable不能使用在要将数据存储在磁盘上的情况，因为Parcelable不能很好的保证数据的持续性在外界有变化的情况下。尽管Serializable效率低点， 也不提倡用，但在这种情况下，还是建议你用Serializable 。
+5）补充：Serializable和Parcelable比较
+    Serializable的作用是为了保存对象的属性到本地文件、数据库、网络流、rmi以方便数据传输，当然这种传输可以是程序内的也可以是两个程序间的。
+而Android的Parcelable的设计初衷是因为Serializable效率过慢，为了在程序内不同组件间以及不同Android程序间(AIDL)高效的传输数据而设计，这些数据仅在内存中存在，Parcelable是通过IBinder通信的消息的载体。
+    Parcelable的性能比Serializable好，在内存开销方面较小，所以在内存间数据传输时推荐使用Parcelable，如activity间传输数据，而Serializable可将数据持久化方便保存，所以在需要保存或网络传输数据时选择Serializable，因为android不同版本Parcelable可能不同，所以不推荐使用Parcelable进行数据持久化
+    Serializable序列化不保存静态变量，可以使用Transient关键字对部分字段不进行序列化，也可以覆盖writeObject、readObject方法以实现序列化过程自定义
+    1、在使用内存的时候，Parcelable 类比Serializable性能高，所以推荐使用Parcelable类。
+    2、Serializable在序列化的时候会产生大量的临时变量，从而引起频繁的GC。
+    3、Parcelable不能使用在要将数据存储在磁盘上的情况，因为Parcelable不能很好的保证数据的持续性在外界有变化的情况下。尽管Serializable效率低点， 也不提倡用，但在这种情况下，还是建议你用Serializable 。
 
 1）创建临时文件
 PMS：
@@ -687,6 +711,37 @@ PMS：
             return ret;
         }
 
+    此处获取PackageLite信息的过程与之前获取Package过程类似，不做解释
+    public static PackageLite parsePackageLite(String packageFilePath, int flags) {
+        AssetManager assmgr = null;
+        final XmlResourceParser parser;
+        final Resources res;
+        try {
+            assmgr = new AssetManager();
+            assmgr.setConfiguration(0, 0, null, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    Build.VERSION.RESOURCES_SDK_INT);
+
+            int cookie = assmgr.addAssetPath(packageFilePath);
+            if (cookie == 0) {
+                return null;
+            }
+
+            final DisplayMetrics metrics = new DisplayMetrics();
+            metrics.setToDefaults();
+            res = new Resources(assmgr, metrics, null);
+            // 文件读取
+            parser = assmgr.openXmlResourceParser(cookie, ANDROID_MANIFEST_FILENAME);
+        } catch (Exception e) {
+            if (assmgr != null) assmgr.close(); 
+            return null;
+        }
+        // 获取节点信息
+        packageLite = parsePackageLite(res, parser, attrs, flags, errors);
+        ...
+        return packageLite;
+    }
+
+DefaultContainerService.java
     // 获取合理的安装位置
     private int recommendAppInstallLocation(int installLocation, String archiveFilePath, int flags, long threshold) {
         int prefer;
@@ -695,17 +750,6 @@ PMS：
         final boolean isForwardLocked = (flags & PackageManager.INSTALL_FORWARD_LOCK) != 0;
 
         check_inner : {
-            /*
-             * Explicit install flags should override the manifest settings.
-             */
-            if ((flags & PackageManager.INSTALL_INTERNAL) != 0) {
-                prefer = PREFER_INTERNAL;
-                break check_inner;
-            } else if ((flags & PackageManager.INSTALL_EXTERNAL) != 0) {
-                prefer = PREFER_EXTERNAL;
-                break check_inner;
-            }
-
             /* No install flags. Check for manifest option. */
             if (installLocation == PackageInfo.INSTALL_LOCATION_INTERNAL_ONLY) {
                 prefer = PREFER_INTERNAL;
@@ -715,7 +759,7 @@ PMS：
                 checkBoth = true;
                 break check_inner;
             } else if (installLocation == PackageInfo.INSTALL_LOCATION_AUTO) {
-                // 1) 默认情况下是内部存储
+// 1) 默认情况下是内部存储
                 prefer = PREFER_INTERNAL;
                 checkBoth = true;
                 break check_inner;
@@ -913,6 +957,7 @@ PackageManagerService$FileInstallArgs:
 PackageManagerService$InstallParams
         void handleReturnCode() {
             if (mArgs != null) {
+                // 处理过程
                 processPendingInstall(mArgs, mRet);
 
                 if (mTempPackage != null) {
@@ -2074,6 +2119,30 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
 
 PackageManagerService$PackageHandler
         void doHandleMessage(Message msg) {
+                case MCS_BOUND: {
+                        // 取处队列中的第一个任务
+                        HandlerParams params = mPendingInstalls.get(0);
+                        if (params != null) { 
+                           // 3.3) 开始安装
+                            if (params.startCopy()) { 
+                                // 移除已安装的任务
+                                if (mPendingInstalls.size() > 0) {
+                                    mPendingInstalls.remove(0);
+                                }
+                                // 如果当前没有任务了，且与DCS建立连接，发送消息断开该连接
+                                if (mPendingInstalls.size() == 0) {
+                                    if (mBound) {
+                                        removeMessages(MCS_UNBIND);
+                                        Message ubmsg = obtainMessage(MCS_UNBIND);
+                                        sendMessageDelayed(ubmsg, 10000);
+                                    }
+                                } else {
+                                    // 如果还有安装任务，将继续执行队列中的下一个任务
+                                    mHandler.sendEmptyMessage(MCS_BOUND);
+                                }
+                            }
+                        }
+                  }
                 case POST_INSTALL: {
                     if (DEBUG_INSTALL) Log.v(TAG, "Handling post-install for " + msg.arg1);
                     PostInstallData data = mRunningInstalls.get(msg.arg1);
@@ -2118,7 +2187,11 @@ PackageManagerService$PackageHandler
                         Slog.e(TAG, "Bogus post-install token " + msg.arg1);
                     }
                 } break;
-
+总结：
+    apk安装过程：
+    1）apk解压缩，提取AndroidManifest.xml其中的数据，
+    2）拷贝apk到推荐位置
+    3）将AndroidManifest.xml中的信息保存到PMS的数据结构中
 
 
 
