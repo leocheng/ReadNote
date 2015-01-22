@@ -5026,8 +5026,112 @@ I/aidy    (16675): onResume() -- end -- dTime = 4 -- allTime = 951 -- current = 
   周三：2015-01-21
 	任务：
 	–---------------------------------------------------------------------------	
+	PR:886824 -- POP10 -- Launcher3界面不显示
+	切换语言一直点击back键，hotseat不显示
+
+workspace进入设置
+I/aidy    (19000): Launcher -- onPause()
+I/aidy    (19000): Launcher -- onStop()
+切换语言
+I/aidy    (19000): Launcher -- onDestroy()
+I/aidy    (19000): Launcher -- onCreate()
+I/aidy    (19000): Launcher -- onStart()
+I/aidy    (19000): Launcher -- onResume()
+
+I/aidy    (19000): Workspace -- onResume()
+I/aidy    (19000): Launcher -- onBackPressed()
+I/aidy    (19000): Launcher -- onBackPressed()
+
+=================================
+AllApp进入设置
+I/aidy    (19000): Launcher -- onPause()
+I/aidy    (19000): Launcher -- onStop()
+切换语言 -- 快速点击back键
+I/aidy    (19000): Launcher -- onDestroy()
+I/aidy    (19000): Launcher -- onCreate()
+I/aidy    (19000): Launcher -- onStart()
+I/aidy    (19000): Launcher -- onResume()
+
+I/aidy    (19000): Launcher -- showAllApps()
+I/aidy    (19000): Launcher -- showAppsCustomizeHelper()
+I/aidy    (19000): Workspace -- onResume()
+
+I/aidy    (19000): Launcher -- onBackPressed()
+I/aidy    (19000): Launcher -- showworkspace()
+I/aidy    (19000): Launcher -- onBackPressed()
+I/aidy    (19000): Launcher -- onBackPressed()
+I/aidy    (19000): Launcher -- onBackPressed()
+
+================================
+AllApp进入设置
+I/aidy    (19000): Launcher -- onPause()
+I/aidy    (19000): Launcher -- onStop()
+切换语言 -- 慢速点击back键
+I/aidy    (19000): Launcher -- onDestroy()
+I/aidy    (19000): Launcher -- onCreate()
+I/aidy    (19000): Launcher -- onStart()
+I/aidy    (19000): Launcher -- onResume()
+
+I/aidy    (19000): Launcher -- showAllApps()
+I/aidy    (19000): Launcher -- showAppsCustomizeHelper()
+I/aidy    (19000): Workspace -- onResume()
+
+I/aidy    (19000): Launcher -- onBackPressed()
+I/aidy    (19000): Launcher -- showworkspace()
+I/aidy    (19000): Launcher -- onBackPressed()
+I/aidy    (19000): Launcher -- onBackPressed()
+I/aidy    (19000): Launcher -- onBackPressed()
 	
 	
+	
+	
+	PR：892734 -- PIXO8_3G -- Weather widget无法切换地址
+	xml/appwidget_info.xml
+    <receiver android:name="com.jrdcom.widget.WeatherClockWidget" >
+        <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            <action android:name="android.intent.action.WEATHER_BROADCAST" />
+            <action android:name="android.intent.action.NEXT_CITY_WIDGET_UPDATE" />
+            <action android:name="android.intent.action.UNIT_BROADCAST" />
+            <action android:name="android.intent.action.WEATHERICON_NEED_BROADCAST" />
+            <action android:name="android.intent.action.WEATHERICON_GIVE_BROADCAST" />
+            <action android:name="android.intent.action.WEATHERDATA_CLEAN_BROADCAST" />
+        </intent-filter>
+        <meta-data
+            android:name="android.appwidget.provider"
+            android:resource="@xml/appwidget_info" />
+    </receiver>
+	
+第一次点击不成功	
+I/aidy    (17772): WeatherClockWidget -- onReceive() -- action = android.intent.action.NEXT_CITY_WIDGET_UPDATE
+I/aidy    (17772): UpdateWidgetTimeService -- onCreate()
+I/aidy    (17772): UpdateWidgetTimeService -- onStartCommand()
+I/aidy    (17772): WeatherClockWidget -- onReceive() -- action = android.intent.action.WEATHERICON_GIVE_BROADCAST
+I/aidy    (17772): WeatherClockWidget -- onReceive() -- action = android.intent.action.WEATHERICON_GIVE_BROADCAST
+
+点击成功
+I/aidy    (17772): UpdateWidgetTimeService -- onReceive() -- action = android.intent.action.NEXT_CITY_WIDGET_UPDATE
+I/aidy    (17772): WeatherClockWidget -- onReceive() -- action = android.intent.action.NEXT_CITY_WIDGET_UPDATE
+I/aidy    (17772): WeatherClockWidget -- onReceive() -- action = android.intent.action.WEATHERICON_GIVE_BROADCAST
+I/aidy    (17772): UpdateWidgetTimeService -- onStartCommand()
+I/aidy    (17772): WeatherClockWidget -- onReceive() -- action = android.intent.action.WEATHERICON_GIVE_BROADCAST
+	
+	        if(intent.getAction().equals("android.intent.action.NEXT_CITY_WIDGET_UPDATE")) {
+            Intent intentService = new Intent(context, UpdateWidgetTimeService.class);
+            intentService.setAction(UPDATE_NEXT_CITY);
+            context.startService(intentService);
+        }
+	
+	
+	
+	//            mFilter.addAction("android.intent.action.NEXT_CITY_WIDGET_UPDATE");
+            mFilter.addAction(WeatherClockWidget.UPDATE_NEXT_CITY);
+	
+	        } else if(intent != null && intent.getAction().equals(WeatherClockWidget.UPDATE_NEXT_CITY)) {
+            sendBroadcast(new Intent(WeatherClockWidget.UPDATE_NEXT_CITY));
+	
+	//                } else if (intent.getAction().equals("android.intent.action.NEXT_CITY_WIDGET_UPDATE")) {
+                } else if(intent.getAction().equals(WeatherClockWidget.UPDATE_NEXT_CITY)) {
 	疑难：
 	–---------------------------------------------------------------------------
   ==================================== 

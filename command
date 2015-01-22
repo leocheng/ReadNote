@@ -196,6 +196,8 @@ logcat
 		adb logcat -s "activitymanager"
 	清楚log
 		adb logcat -c
+    输出优先级大于warn级别
+		adb logcat *:W
 	
 Usage: logcat [options] [filterspecs]
 options include:
