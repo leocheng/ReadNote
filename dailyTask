@@ -5138,7 +5138,41 @@ I/aidy    (17772): WeatherClockWidget -- onReceive() -- action = android.intent.
   周四：2015-01-22
 	任务：
 	–---------------------------------------------------------------------------	
+	PR： 905775 -- POP10 -- [Wifi-display]Wifi-transfer can not set photos via crop photo
+	参考资料：http://blog.csdn.net/tempersitu/article/details/20557383
+报错log
+    01-03 13:17:20.566: E/AndroidRuntime(13855): FATAL EXCEPTION: PanoramaClient
+    01-03 13:17:20.566: E/AndroidRuntime(13855): Process: com.google.android.apps.plus, PID: 13855
+    01-03 13:17:20.566: E/AndroidRuntime(13855): java.lang.SecurityException: Uid 10107 does not have permission to uri 0 @ content://com.android.providers.media.documents/document/image%3A62
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at android.os.Parcel.readException(Parcel.java:1540)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at android.os.Parcel.readException(Parcel.java:1493)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at android.app.ActivityManagerProxy.grantUriPermission(ActivityManagerNative.java:3895)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at android.app.ContextImpl.grantUriPermission(ContextImpl.java:1932)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at android.content.ContextWrapper.grantUriPermission(ContextWrapper.java:598)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at gkc.a(Unknown Source)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at gkf.a(Unknown Source)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at gdr.b(Unknown Source)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at ged.a(Unknown Source)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at ged.b(Unknown Source)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at ged.a(Unknown Source)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at gkb.a(Unknown Source)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at iea.handleMessage(PG:139)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at android.os.Handler.dispatchMessage(Handler.java:98)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at android.os.Looper.loop(Looper.java:135)
+    01-03 13:17:20.566: E/AndroidRuntime(13855): 	at android.os.HandlerThread.run(HandlerThread.java:61)
 	
+framework/base/packages/DocumentsUI
+recent:
+	DirectoryFragment.onItemClick() --> DocumentsActivity.onDocumentPicked()
+	    --> DocumentsActivity.ExistingFinishTask --> onFinished()
+	    
+	    
+./src/com/jrdcom/wifitransfer/ui/CreateOrModifyUser.java:341:                inflate.findViewById(R.id.select_from_gallery).setOnClickListener(
+
+
+
+培训：
+    PackageManagerService$FileInstallArgs.copyApk()
 	
 	疑难：
 	–---------------------------------------------------------------------------

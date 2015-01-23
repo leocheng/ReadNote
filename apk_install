@@ -843,8 +843,6 @@ DefaultContainerService.java
         }
     }
 
-
-
 3）处理安装位置，检查上述推荐的安装位置
 PackageManagerService$InstallParams：
         private int installLocationPolicy(PackageInfoLite pkgLite, int flags) {
@@ -904,54 +902,67 @@ PackageManagerService$InstallParams：
 4）FileInstallArgs拷贝apk
 PackageManagerService$FileInstallArgs:
         int copyApk(IMediaContainerService imcs, boolean temp) throws RemoteException {
-            if (temp) {
-                // 创建临时文件 File tmpPackageFile = File.createTempFile("vmdl", ".tmp", installDir);
-                createCopyFile();
-            }
-            // Get a ParcelFileDescriptor to write to the output file
-            File codeFile = new File(codeFileName);
-            … ...
-            ParcelFileDescriptor out = null;
-            try {
-                out = ParcelFileDescriptor.open(codeFile, ParcelFileDescriptor.MODE_READ_WRITE);
-            } catch (FileNotFoundException e) { 
-                return PackageManager.INSTALL_FAILED_INSUFFICIENT_STORAGE;
-            }
+            ...
             // Copy the resource now
             int ret = PackageManager.INSTALL_FAILED_INSUFFICIENT_STORAGE;
             try {
                 mContext.grantUriPermission(DEFAULT_CONTAINER_PACKAGE, packageURI, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                // 由DefaultContainerService进行拷贝工作
                 ret = imcs.copyResource(packageURI, null, out);
             } finally {
                 IoUtils.closeQuietly(out);
                 mContext.revokeUriPermission(packageURI, Intent.FLAG_GRANT_READ_URI_PERMISSION);
             }
 
-            if (isFwdLocked()) {
-                final File destResourceFile = new File(getResourcePath());
-
-                // Copy the public files
-                try {
-                    PackageHelper.extractPublicFiles(codeFileName, destResourceFile);
-                } catch (IOException e) {
-                    
-                }
-            }
-
-            final File nativeLibraryFile = new File(getNativeLibraryPath());
-            try {
-                int copyRet = copyNativeLibrariesForInternalApp(codeFile, nativeLibraryFile); 
-            } catch (IOException e) {
-                … ...
-            }
-
+            ...
             return ret;
         }
+DefaultContainerService.java:
+    private IMediaContainerService.Stub mBinder = new IMediaContainerService.Stub() {
+        @Override
+        public int copyPackage(String packagePath, IParcelFileDescriptorFactory target) {
+            if (packagePath == null || target == null) {
+                return PackageManager.INSTALL_FAILED_INVALID_URI;
+            }
 
-
-
-
-
+            PackageLite pkg = null;
+            try {
+                final File packageFile = new File(packagePath);
+                pkg = PackageParser.parsePackageLite(packageFile, 0);
+                return copyPackageInner(pkg, target);
+            } catch (PackageParserException | IOException | RemoteException e) {
+                Slog.w(TAG, "Failed to copy package at " + packagePath + ": " + e);
+                return PackageManager.INSTALL_FAILED_INSUFFICIENT_STORAGE;
+            }
+        }
+    }
+    
+    private int copyPackageInner(PackageLite pkg, IParcelFileDescriptorFactory target)
+            throws IOException, RemoteException {
+        copyFile(pkg.baseCodePath, target, "base.apk");
+        if (!ArrayUtils.isEmpty(pkg.splitNames)) {
+            for (int i = 0; i < pkg.splitNames.length; i++) {
+                copyFile(pkg.splitCodePaths[i], target, "split_" + pkg.splitNames[i] + ".apk");
+            }
+        }
+        return PackageManager.INSTALL_SUCCEEDED;
+    }
+    // 流操作
+    private void copyFile(String sourcePath, IParcelFileDescriptorFactory target, String targetName)
+            throws IOException, RemoteException {
+        Slog.d(TAG, "Copying " + sourcePath + " to " + targetName);
+        InputStream in = null;
+        OutputStream out = null;
+        try {
+            in = new FileInputStream(sourcePath);
+            out = new ParcelFileDescriptor.AutoCloseOutputStream(
+                    target.open(targetName, ParcelFileDescriptor.MODE_READ_WRITE));
+            Streams.copy(in, out);
+        } finally {
+            IoUtils.closeQuietly(out);
+            IoUtils.closeQuietly(in);
+        }
+    }
 
 3.3.2) 安装完后的后续操作
 PackageManagerService$InstallParams
@@ -1003,48 +1014,14 @@ PackageManagerService:
 
 1) 调用FileInstallArgs的doPreInstall()
         int doPreInstall(int status) {
+            // 如果安装失败，清楚之前拷贝的apk文件
             if (status != PackageManager.INSTALL_SUCCEEDED) {
                 cleanUp();
             }
             return status;
         }
 
-        private boolean cleanUp() {
-            boolean ret = true;
-            String sourceDir = getCodePath();
-            String publicSourceDir = getResourcePath();
-            if (sourceDir != null) {
-                File sourceFile = new File(sourceDir);
-                if (!sourceFile.exists()) {
-                    Slog.w(TAG, "Package source " + sourceDir + " does not exist.");
-                    ret = false;
-                }
-                // Delete application's code and resources
-                sourceFile.delete();
-            }
-            if (publicSourceDir != null && !publicSourceDir.equals(sourceDir)) {
-                final File publicSourceFile = new File(publicSourceDir);
-                if (!publicSourceFile.exists()) {
-                    Slog.w(TAG, "Package public source " + publicSourceFile + " does not exist.");
-                }
-                if (publicSourceFile.exists()) {
-                    publicSourceFile.delete();
-                }
-            }
-
-            if (libraryPath != null) {
-                File nativeLibraryFile = new File(libraryPath);
-                NativeLibraryHelper.removeNativeBinariesFromDirLI(nativeLibraryFile);
-                if (!nativeLibraryFile.delete()) {
-                    Slog.w(TAG, "Couldn't delete native library directory " + libraryPath);
-                }
-            }
-
-            return ret;
-        }
-
 2) 调用installPackageLI进行安装
-PMS
     private void installPackageLI(InstallArgs args, boolean newInstall, PackageInstalledInfo res) {
         ... ...
         // Get rid of all references to package scan path via parser.
@@ -1096,51 +1073,28 @@ PMS
 
 2.1）对临时文件进行改名
 PMS$FileInstallArgs
-        boolean doRename(int status, final String pkgName, String oldCodePath) {
+        boolean doRename(int status, PackageParser.Package pkg, String oldCodePath) {
             if (status != PackageManager.INSTALL_SUCCEEDED) {
                 cleanUp();
                 return false;
             } else {
-                final File oldCodeFile = new File(getCodePath());
-                final File oldResourceFile = new File(getResourcePath());
-                final File oldLibraryFile = new File(getNativeLibraryPath());
+                final File beforeCodeFile = codeFile;
+                final File afterCodeFile = getNextCodePath(pkg.packageName);
 
-                // Rename APK file based on packageName
-                final String apkName = getNextCodePath(oldCodePath, pkgName, ".apk");
-                final File newCodeFile = new File(installDir, apkName + ".apk");
-                if (!oldCodeFile.renameTo(newCodeFile)) {
+                Slog.d(TAG, "Renaming " + beforeCodeFile + " to " + afterCodeFile);
+                try {
+                    Os.rename(beforeCodeFile.getAbsolutePath(), afterCodeFile.getAbsolutePath());
+                } catch (ErrnoException e) { 
                     return false;
                 }
-                codeFileName = newCodeFile.getPath();
-
-                // Rename public resource file if it's forward-locked.
-                final File newResFile = new File(getResourcePathFromCodePath());
-                if (isFwdLocked() && !oldResourceFile.renameTo(newResFile)) {
-                    return false;
-                }
-                resourceFileName = newResFile.getPath();
-
-                // Rename library path
-                final File newLibraryFile = new File(getLibraryPathFromCodePath());
-                if (newLibraryFile.exists()) {
-                    NativeLibraryHelper.removeNativeBinariesFromDirLI(newLibraryFile);
-                    newLibraryFile.delete();
-                }
-                if (!oldLibraryFile.renameTo(newLibraryFile)) {
-                    Slog.e(TAG, "Cannot rename native library directory "
-                            + oldLibraryFile.getPath() + " to " + newLibraryFile.getPath());
-                    return false;
-                }
-                libraryPath = newLibraryFile.getPath();
-
-                // Attempt to set permissions
-                if (!setPermissions()) {
-                    return false;
-                }
-
-                if (!SELinux.restorecon(newCodeFile)) {
-                    return false;
-                }
+                ...
+                // Reflect the rename in app info
+                pkg.applicationInfo.setCodePath(pkg.codePath);
+                pkg.applicationInfo.setBaseCodePath(pkg.baseCodePath);
+                pkg.applicationInfo.setSplitCodePaths(pkg.splitCodePaths);
+                pkg.applicationInfo.setResourcePath(pkg.codePath);
+                pkg.applicationInfo.setBaseResourcePath(pkg.baseCodePath);
+                pkg.applicationInfo.setSplitResourcePaths(pkg.splitCodePaths);
 
                 return true;
             }
@@ -1172,40 +1126,10 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
 4）将Package中的Activity、Service等私有信息保存PMS的数据结构中，变成公有的
     private PackageParser.Package scanPackageLI(PackageParser.Package pkg,
             int parseFlags, int scanMode, long currentTime, UserHandle user) {
-        File scanFile = new File(pkg.mScanPath);
-        if (scanFile == null || pkg.applicationInfo.sourceDir == null ||
-                pkg.applicationInfo.publicSourceDir == null) {
-            // Bail out. The resource and code paths haven't been set.
-            Slog.w(TAG, " Code and resource paths haven't been set correctly");
-            mLastScanError = PackageManager.INSTALL_FAILED_INVALID_APK;
-            return null;
-        }
-        mScanningPath = scanFile;
-
-        if ((parseFlags&PackageParser.PARSE_IS_SYSTEM) != 0) {
-            pkg.applicationInfo.flags |= ApplicationInfo.FLAG_SYSTEM;
-        }
-
-        if ((parseFlags&PackageParser.PARSE_IS_PRIVILEGED) != 0) {
-            pkg.applicationInfo.flags |= ApplicationInfo.FLAG_PRIVILEGED;
-        }
-
-        if (mCustomResolverComponentName != null &&
-                mCustomResolverComponentName.getPackageName().equals(pkg.packageName)) {
-            setUpCustomResolverActivity(pkg);
-        }
-
+        ...
+        // 特殊处理framework-res.apk
         if (pkg.packageName.equals("android")) {
             synchronized (mPackages) {
-                if (mAndroidApplication != null) {
-                    Slog.w(TAG, "*************************************************");
-                    Slog.w(TAG, "Core android package being redefined.  Skipping.");
-                    Slog.w(TAG, " file=" + mScanningPath);
-                    Slog.w(TAG, "*************************************************");
-                    mLastScanError = PackageManager.INSTALL_FAILED_DUPLICATE_PACKAGE;
-                    return null;
-                }
-
                 // Set up information for our fall-back user intent resolution activity.
                 mPlatformPackage = pkg;
                 pkg.mVersionCode = mSdkVersion;
@@ -1230,37 +1154,25 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
                 }
             }
         }
-
-        if (DEBUG_PACKAGE_SCANNING) {
-            if ((parseFlags & PackageParser.PARSE_CHATTY) != 0)
-                Log.d(TAG, "Scanning package " + pkg.packageName);
-        }
-
+        // mPackages保存了所有的Package信息，已包名为key，HashMap<String, PackageParser.Package>
         if (mPackages.containsKey(pkg.packageName)
-                || mSharedLibraries.containsKey(pkg.packageName)) {
-            Slog.w(TAG, "Application package " + pkg.packageName
-                    + " already installed.  Skipping duplicate.");
+                || mSharedLibraries.containsKey(pkg.packageName)) { 
             mLastScanError = PackageManager.INSTALL_FAILED_DUPLICATE_PACKAGE;
             return null;
         }
-
-        // Initialize package source and resource directories
-        File destCodeFile = new File(pkg.applicationInfo.sourceDir);
-        File destResourceFile = new File(pkg.applicationInfo.publicSourceDir);
-
-        SharedUserSetting suid = null;
-        PackageSetting pkgSetting = null;
-
+        ...
+        // 是否未系统App
         if (!isSystemApp(pkg)) {
             // Only system apps can use these features.
             pkg.mOriginalPackages = null;
             pkg.mRealPackage = null;
             pkg.mAdoptPermissions = null;
         }
-
+------------synchronized---------------------------
         // writer
         synchronized (mPackages) {
             if ((parseFlags&PackageParser.PARSE_IS_SYSTEM_DIR) == 0) {
+                // 在安装非系统应用是检查lib是否与他们实际的位置相匹配
                 // Check all shared libraries and map to their actual file path.
                 // We only do this here for apps not on a system dir, because those
                 // are the only ones that can fail an install due to this.  We
@@ -1270,7 +1182,7 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
                     return null;
                 }
             }
-
+            // 如果Package中声明了SharedUser,处理其对应SharedUserSettings相关内容
             if (pkg.mSharedUserId != null) {
                 suid = mSettings.getSharedUserLPw(pkg.mSharedUserId, 0, true);
                 if (suid == null) {
@@ -1279,140 +1191,19 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
                     mLastScanError = PackageManager.INSTALL_FAILED_INSUFFICIENT_STORAGE;
                     return null;
                 }
-                if (DEBUG_PACKAGE_SCANNING) {
-                    if ((parseFlags & PackageParser.PARSE_CHATTY) != 0)
-                        Log.d(TAG, "Shared UserID " + pkg.mSharedUserId + " (uid=" + suid.userId
-                                + "): packages=" + suid.packages);
-                }
             }
             
-            // Check if we are renaming from an original package name.
-            PackageSetting origPackage = null;
-            String realName = null;
-            if (pkg.mOriginalPackages != null) {
-                // This package may need to be renamed to a previously
-                // installed name.  Let's check on that...
-                final String renamed = mSettings.mRenamedPackages.get(pkg.mRealPackage);
-                if (pkg.mOriginalPackages.contains(renamed)) {
-                    // This package had originally been installed as the
-                    // original name, and we have already taken care of
-                    // transitioning to the new one.  Just update the new
-                    // one to continue using the old name.
-                    realName = pkg.mRealPackage;
-                    if (!pkg.packageName.equals(renamed)) {
-                        // Callers into this function may have already taken
-                        // care of renaming the package; only do it here if
-                        // it is not already done.
-                        pkg.setPackageName(renamed);
-                    }
-                    
-                } else {
-                    for (int i=pkg.mOriginalPackages.size()-1; i>=0; i--) {
-                        if ((origPackage = mSettings.peekPackageLPr(
-                                pkg.mOriginalPackages.get(i))) != null) {
-                            // We do have the package already installed under its
-                            // original name...  should we use it?
-                            if (!verifyPackageUpdateLPr(origPackage, pkg)) {
-                                // New package is not compatible with original.
-                                origPackage = null;
-                                continue;
-                            } else if (origPackage.sharedUser != null) {
-                                // Make sure uid is compatible between packages.
-                                if (!origPackage.sharedUser.name.equals(pkg.mSharedUserId)) {
-                                    Slog.w(TAG, "Unable to migrate data from " + origPackage.name
-                                            + " to " + pkg.packageName + ": old uid "
-                                            + origPackage.sharedUser.name
-                                            + " differs from " + pkg.mSharedUserId);
-                                    origPackage = null;
-                                    continue;
-                                }
-                            } else {
-                                if (DEBUG_UPGRADE) Log.v(TAG, "Renaming new package "
-                                        + pkg.packageName + " to old name " + origPackage.name);
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            if (mTransferedPackages.contains(pkg.packageName)) {
-                Slog.w(TAG, "Package " + pkg.packageName
-                        + " was transferred to another, but its .apk remains");
-            }
-            
-            // Just create the setting, don't add it yet. For already existing packages
-            // the PkgSetting exists already and doesn't have to be created.
-            pkgSetting = mSettings.getPackageLPw(pkg, origPackage, realName, suid, destCodeFile,
-                    destResourceFile, pkg.applicationInfo.nativeLibraryDir,
-                    pkg.applicationInfo.flags, user, false);
-            if (pkgSetting == null) {
-                Slog.w(TAG, "Creating application package " + pkg.packageName + " failed");
-                mLastScanError = PackageManager.INSTALL_FAILED_INSUFFICIENT_STORAGE;
-                return null;
-            }
-            
-            if (pkgSetting.origPackage != null) {
-                // If we are first transitioning from an original package,
-                // fix up the new package's name now.  We need to do this after
-                // looking up the package under its new name, so getPackageLP
-                // can take care of fiddling things correctly.
-                pkg.setPackageName(origPackage.name);
-                
-                // File a report about this.
-                String msg = "New package " + pkgSetting.realName
-                        + " renamed to replace old package " + pkgSetting.name;
-                reportSettingsProblem(Log.WARN, msg);
-                
-                // Make a note of it.
-                mTransferedPackages.add(origPackage.name);
-                
-                // No longer need to retain this.
-                pkgSetting.origPackage = null;
-            }
-            
-            if (realName != null) {
-                // Make a note of it.
-                mTransferedPackages.add(pkg.packageName);
-            }
-            
-            if (mSettings.isDisabledSystemPackageLPr(pkg.packageName)) {
-                pkg.applicationInfo.flags |= ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
-            }
-
-            if (mFoundPolicyFile) {
-                SELinuxMMAC.assignSeinfoValue(pkg);
-            }
+            ... ...
 
             pkg.applicationInfo.uid = pkgSetting.appId;
             pkg.mExtras = pkgSetting;
-
+            
+            // 检查该Package的签名信息
             if (!verifySignaturesLP(pkgSetting, pkg)) {
-                if ((parseFlags&PackageParser.PARSE_IS_SYSTEM_DIR) == 0) {
-                    return null;
-                }
-                // The signature has changed, but this package is in the system
-                // image...  let's recover!
-                pkgSetting.signatures.mSignatures = pkg.mSignatures;
-                // However...  if this package is part of a shared user, but it
-                // doesn't match the signature of the shared user, let's fail.
-                // What this means is that you can't change the signatures
-                // associated with an overall shared user, which doesn't seem all
-                // that unreasonable.
-                if (pkgSetting.sharedUser != null) {
-                    if (compareSignatures(pkgSetting.sharedUser.signatures.mSignatures,
-                            pkg.mSignatures) != PackageManager.SIGNATURE_MATCH) {
-                        Log.w(TAG, "Signature mismatch for shared user : " + pkgSetting.sharedUser);
-                        mLastScanError = PackageManager.INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES;
-                        return null;
-                    }
-                }
-                // File a report about this.
-                String msg = "System package " + pkg.packageName
-                        + " signature changed; retaining data.";
-                reportSettingsProblem(Log.WARN, msg);
+                ...
             }
-
+            
+            // 检查该App中的Content providers与已有的Package相冲突
             // Verify that this new package doesn't have any content providers
             // that conflict with existing packages.  Only do this if the
             // package isn't already installed, since we don't want to break
@@ -1427,11 +1218,6 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
                         for (int j = 0; j < names.length; j++) {
                             if (mProvidersByAuthority.containsKey(names[j])) {
                                 PackageParser.Provider other = mProvidersByAuthority.get(names[j]);
-                                Slog.w(TAG, "Can't install because provider name " + names[j] +
-                                        " (in package " + pkg.applicationInfo.packageName +
-                                        ") is already used by "
-                                        + ((other != null && other.getComponentName() != null)
-                                                ? other.getComponentName().getPackageName() : "?"));
                                 mLastScanError = PackageManager.INSTALL_FAILED_CONFLICTING_PROVIDER;
                                 return null;
                             }
@@ -1448,19 +1234,18 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
                     final PackageSetting orig = mSettings.peekPackageLPr(origName);
                     if (orig != null) {
                         if (verifyPackageUpdateLPr(orig, pkg)) {
-                            Slog.i(TAG, "Adopting permissions from " + origName + " to "
-                                    + pkg.packageName);
                             mSettings.transferPermissionsLPw(origName, pkg.packageName);
                         }
                     }
                 }
             }
         }
-
+------------------synchronized----------------------------------
         final String pkgName = pkg.packageName;
         
         final long scanFileTime = scanFile.lastModified();
         final boolean forceDex = (scanMode&SCAN_FORCE_DEX) != 0;
+        // 确定该应用的进程名称
         pkg.applicationInfo.processName = fixProcessName(
                 pkg.applicationInfo.packageName,
                 pkg.applicationInfo.processName,
@@ -1472,12 +1257,14 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
             dataPath = new File (Environment.getDataDirectory(), "system");
             pkg.applicationInfo.dataDir = dataPath.getPath();
         } else {
+            // 创建目录data/data/packagename
             // This is a normal package, need to make its data directory.
             dataPath = getDataPathForPackage(pkg.packageName, 0);
 
             boolean uidError = false;
 
             if (dataPath.exists()) {
+                // 获取进程id
                 int currentUid = 0;
                 try {
                     StructStat stat = Libcore.os.stat(dataPath.getPath());
@@ -1504,63 +1291,13 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
                             reportSettingsProblem(Log.WARN, msg);
                         }
                     }
-                    if (!recovered && ((parseFlags&PackageParser.PARSE_IS_SYSTEM) != 0
-                            || (scanMode&SCAN_BOOTING) != 0)) {
-                        // If this is a system app, we can at least delete its
-                        // current data so the application will still work.
-                        int ret = removeDataDirsLI(pkgName);
-                        if (ret >= 0) {
-                            // TODO: Kill the processes first
-                            // Old data gone!
-                            String prefix = (parseFlags&PackageParser.PARSE_IS_SYSTEM) != 0
-                                    ? "System package " : "Third party package ";
-                            String msg = prefix + pkg.packageName
-                                    + " has changed from uid: "
-                                    + currentUid + " to "
-                                    + pkg.applicationInfo.uid + "; old data erased";
-                            reportSettingsProblem(Log.WARN, msg);
-                            recovered = true;
-
-                            // And now re-install the app.
-                            ret = createDataDirsLI(pkgName, pkg.applicationInfo.uid,
-                                                   pkg.applicationInfo.seinfo);
-                            if (ret == -1) {
-                                // Ack should not happen!
-                                msg = prefix + pkg.packageName
-                                        + " could not have data directory re-created after delete.";
-                                reportSettingsProblem(Log.WARN, msg);
-                                mLastScanError = PackageManager.INSTALL_FAILED_INSUFFICIENT_STORAGE;
-                                return null;
-                            }
-                        }
-                        if (!recovered) {
-                            mHasSystemUidErrors = true;
-                        }
                     } else if (!recovered) {
                         // If we allow this install to proceed, we will be broken.
                         // Abort, abort!
                         mLastScanError = PackageManager.INSTALL_FAILED_UID_CHANGED;
                         return null;
                     }
-                    if (!recovered) {
-                        pkg.applicationInfo.dataDir = "/mismatched_uid/settings_"
-                            + pkg.applicationInfo.uid + "/fs_"
-                            + currentUid;
-                        pkg.applicationInfo.nativeLibraryDir = pkg.applicationInfo.dataDir;
-                        String msg = "Package " + pkg.packageName
-                                + " has mismatched uid: "
-                                + currentUid + " on disk, "
-                                + pkg.applicationInfo.uid + " in settings";
-                        // writer
-                        synchronized (mPackages) {
-                            mSettings.mReadMessages.append(msg);
-                            mSettings.mReadMessages.append('\n');
-                            uidError = true;
-                            if (!pkgSetting.uidError) {
-                                reportSettingsProblem(Log.ERROR, msg);
-                            }
-                        }
-                    }
+                    ...
                 }
                 pkg.applicationInfo.dataDir = dataPath.getPath();
             } else {
@@ -1604,7 +1341,8 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
 
             pkgSetting.uidError = uidError;
         }
-
+-------------------------------------------------------
+        // 在系用应用升级或者非系统应用安装是，如果其包含native库，需将其拷贝到对应目录中
         String path = scanFile.getPath();
         /* Note: We don't want to unpack the native binaries for
          *        system applications, unless they have been updated
@@ -1694,6 +1432,7 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
 
         // writer
         synchronized (mPackages) {
+            // 更新系统应用的lib
             if ((pkg.applicationInfo.flags&ApplicationInfo.FLAG_SYSTEM) != 0) {
                 // Only system apps can add new shared libraries.
                 if (pkg.libraryNames != null) {
@@ -1764,6 +1503,7 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
             }
         }
 
+        // 如果应用正在运行，需要将其kill掉
         // Request the ActivityManager to kill the process(only for existing packages)
         // so that we do not end up in a confused state while the user is still using the older
         // version of the application while the new one gets installed.
@@ -1794,7 +1534,7 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
                         clientPkg.applicationInfo.uid, "update lib");
             }
         }
-
+-------------------------------------------------
         // writer
         synchronized (mPackages) {
             // We don't expect installation to fail beyond this point,
@@ -1832,84 +1572,8 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
                 }
             }
 
-            // Add the package's KeySets to the global KeySetManager
-            KeySetManager ksm = mSettings.mKeySetManager;
-            try {
-                ksm.addSigningKeySetToPackage(pkg.packageName, pkg.mSigningKeys);
-                if (pkg.mKeySetMapping != null) {
-                    for (Map.Entry<String, Set<PublicKey>> entry : pkg.mKeySetMapping.entrySet()) {
-                        if (entry.getValue() != null) {
-                            ksm.addDefinedKeySetToPackage(pkg.packageName,
-                                entry.getValue(), entry.getKey());
-                        }
-                    }
-                }
-            } catch (NullPointerException e) {
-                Slog.e(TAG, "Could not add KeySet to " + pkg.packageName, e);
-            } catch (IllegalArgumentException e) {
-                Slog.e(TAG, "Could not add KeySet to malformed package" + pkg.packageName, e);
-            }
-
-            int N = pkg.providers.size();
-            StringBuilder r = null;
-            int i;
-            for (i=0; i<N; i++) {
-                PackageParser.Provider p = pkg.providers.get(i);
-                p.info.processName = fixProcessName(pkg.applicationInfo.processName,
-                        p.info.processName, pkg.applicationInfo.uid);
-                mProviders.addProvider(p);
-                p.syncable = p.info.isSyncable;
-                if (p.info.authority != null) {
-                    String names[] = p.info.authority.split(";");
-                    p.info.authority = null;
-                    for (int j = 0; j < names.length; j++) {
-                        if (j == 1 && p.syncable) {
-                            // We only want the first authority for a provider to possibly be
-                            // syncable, so if we already added this provider using a different
-                            // authority clear the syncable flag. We copy the provider before
-                            // changing it because the mProviders object contains a reference
-                            // to a provider that we don't want to change.
-                            // Only do this for the second authority since the resulting provider
-                            // object can be the same for all future authorities for this provider.
-                            p = new PackageParser.Provider(p);
-                            p.syncable = false;
-                        }
-                        if (!mProvidersByAuthority.containsKey(names[j])) {
-                            mProvidersByAuthority.put(names[j], p);
-                            if (p.info.authority == null) {
-                                p.info.authority = names[j];
-                            } else {
-                                p.info.authority = p.info.authority + ";" + names[j];
-                            }
-                            if (DEBUG_PACKAGE_SCANNING) {
-                                if ((parseFlags & PackageParser.PARSE_CHATTY) != 0)
-                                    Log.d(TAG, "Registered content provider: " + names[j]
-                                            + ", className = " + p.info.name + ", isSyncable = "
-                                            + p.info.isSyncable);
-                            }
-                        } else {
-                            PackageParser.Provider other = mProvidersByAuthority.get(names[j]);
-                            Slog.w(TAG, "Skipping provider name " + names[j] +
-                                    " (in package " + pkg.applicationInfo.packageName +
-                                    "): name already used by "
-                                    + ((other != null && other.getComponentName() != null)
-                                            ? other.getComponentName().getPackageName() : "?"));
-                        }
-                    }
-                }
-                if ((parseFlags&PackageParser.PARSE_CHATTY) != 0) {
-                    if (r == null) {
-                        r = new StringBuilder(256);
-                    } else {
-                        r.append(' ');
-                    }
-                    r.append(p.info.name);
-                }
-            }
-            if (r != null) {
-                if (DEBUG_PACKAGE_SCANNING) Log.d(TAG, "  Providers: " + r);
-            }
-
+            ...
+            // 添加service信息
             N = pkg.services.size();
             r = null;
             for (i=0; i<N; i++) {
@@ -1930,6 +1594,7 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
                 if (DEBUG_PACKAGE_SCANNING) Log.d(TAG, "  Services: " + r);
             }
 
+            // 添加receiver信息
             N = pkg.receivers.size();
             r = null;
             for (i=0; i<N; i++) {
@@ -1945,11 +1610,9 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
                     }
                     r.append(a.info.name);
                 }
-            }
-            if (r != null) {
-                if (DEBUG_PACKAGE_SCANNING) Log.d(TAG, "  Receivers: " + r);
-            }
-
+            } 
+            
+            // 添加Activity信息
             N = pkg.activities.size();
             r = null;
             for (i=0; i<N; i++) {
@@ -1970,136 +1633,7 @@ scanPackageLI()相对较长，接近1000行，主要做了如下几件事：
                 if (DEBUG_PACKAGE_SCANNING) Log.d(TAG, "  Activities: " + r);
             }
 
-            N = pkg.permissionGroups.size();
-            r = null;
-            for (i=0; i<N; i++) {
-                PackageParser.PermissionGroup pg = pkg.permissionGroups.get(i);
-                PackageParser.PermissionGroup cur = mPermissionGroups.get(pg.info.name);
-                if (cur == null) {
-                    mPermissionGroups.put(pg.info.name, pg);
-                    if ((parseFlags&PackageParser.PARSE_CHATTY) != 0) {
-                        if (r == null) {
-                            r = new StringBuilder(256);
-                        } else {
-                            r.append(' ');
-                        }
-                        r.append(pg.info.name);
-                    }
-                } else {
-                    Slog.w(TAG, "Permission group " + pg.info.name + " from package "
-                            + pg.info.packageName + " ignored: original from "
-                            + cur.info.packageName);
-                    if ((parseFlags&PackageParser.PARSE_CHATTY) != 0) {
-                        if (r == null) {
-                            r = new StringBuilder(256);
-                        } else {
-                            r.append(' ');
-                        }
-                        r.append("DUP:");
-                        r.append(pg.info.name);
-                    }
-                }
-            }
-            if (r != null) {
-                if (DEBUG_PACKAGE_SCANNING) Log.d(TAG, "  Permission Groups: " + r);
-            }
-
-            N = pkg.permissions.size();
-            r = null;
-            for (i=0; i<N; i++) {
-                PackageParser.Permission p = pkg.permissions.get(i);
-                HashMap<String, BasePermission> permissionMap =
-                        p.tree ? mSettings.mPermissionTrees
-                        : mSettings.mPermissions;
-                p.group = mPermissionGroups.get(p.info.group);
-                if (p.info.group == null || p.group != null) {
-                    BasePermission bp = permissionMap.get(p.info.name);
-                    if (bp == null) {
-                        bp = new BasePermission(p.info.name, p.info.packageName,
-                                BasePermission.TYPE_NORMAL);
-                        permissionMap.put(p.info.name, bp);
-                    }
-                    if (bp.perm == null) {
-                        if (bp.sourcePackage == null
-                                || bp.sourcePackage.equals(p.info.packageName)) {
-                            BasePermission tree = findPermissionTreeLP(p.info.name);
-                            if (tree == null
-                                    || tree.sourcePackage.equals(p.info.packageName)) {
-                                bp.packageSetting = pkgSetting;
-                                bp.perm = p;
-                                bp.uid = pkg.applicationInfo.uid;
-                                if ((parseFlags&PackageParser.PARSE_CHATTY) != 0) {
-                                    if (r == null) {
-                                        r = new StringBuilder(256);
-                                    } else {
-                                        r.append(' ');
-                                    }
-                                    r.append(p.info.name);
-                                }
-                            } else {
-                                Slog.w(TAG, "Permission " + p.info.name + " from package "
-                                        + p.info.packageName + " ignored: base tree "
-                                        + tree.name + " is from package "
-                                        + tree.sourcePackage);
-                            }
-                        } else {
-                            Slog.w(TAG, "Permission " + p.info.name + " from package "
-                                    + p.info.packageName + " ignored: original from "
-                                    + bp.sourcePackage);
-                        }
-                    } else if ((parseFlags&PackageParser.PARSE_CHATTY) != 0) {
-                        if (r == null) {
-                            r = new StringBuilder(256);
-                        } else {
-                            r.append(' ');
-                        }
-                        r.append("DUP:");
-                        r.append(p.info.name);
-                    }
-                    if (bp.perm == p) {
-                        bp.protectionLevel = p.info.protectionLevel;
-                    }
-                } else {
-                    Slog.w(TAG, "Permission " + p.info.name + " from package "
-                            + p.info.packageName + " ignored: no group "
-                            + p.group);
-                }
-            }
-            if (r != null) {
-                if (DEBUG_PACKAGE_SCANNING) Log.d(TAG, "  Permissions: " + r);
-            }
-
-            N = pkg.instrumentation.size();
-            r = null;
-            for (i=0; i<N; i++) {
-                PackageParser.Instrumentation a = pkg.instrumentation.get(i);
-                a.info.packageName = pkg.applicationInfo.packageName;
-                a.info.sourceDir = pkg.applicationInfo.sourceDir;
-                a.info.publicSourceDir = pkg.applicationInfo.publicSourceDir;
-                a.info.dataDir = pkg.applicationInfo.dataDir;
-                a.info.nativeLibraryDir = pkg.applicationInfo.nativeLibraryDir;
-                mInstrumentation.put(a.getComponentName(), a);
-                if ((parseFlags&PackageParser.PARSE_CHATTY) != 0) {
-                    if (r == null) {
-                        r = new StringBuilder(256);
-                    } else {
-                        r.append(' ');
-                    }
-                    r.append(a.info.name);
-                }
-            }
-            if (r != null) {
-                if (DEBUG_PACKAGE_SCANNING) Log.d(TAG, "  Instrumentation: " + r);
-            }
-
-            if (pkg.protectedBroadcasts != null) {
-                N = pkg.protectedBroadcasts.size();
-                for (i=0; i<N; i++) {
-                    mProtectedBroadcasts.add(pkg.protectedBroadcasts.get(i));
-                }
-            }
-
-            pkgSetting.setTimeStamp(scanFileTime);
+            ...
         }
 
         return pkg;
