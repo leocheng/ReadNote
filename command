@@ -439,7 +439,7 @@ EPas填写
         学习AMS + PowerManagerService
         Duration	 	>= 25 days
  
- ===================================
+===================================
  打印时间
     private static long preTime = 0;
     private static long allTime  = 0;
@@ -454,10 +454,21 @@ EPas填写
         preTime = System.currentTimeMillis();
     }	 	 	 	 	 
 
- 	 	  	 	 	 	 	 	 	 
-
-
-
+===================================
+Merge代码
+目前Pixi3-7s项目采用同一个Launcher,命名为Launcher3,实际代码是从POP10的Jrdlauncher衍生而来。
+因此，在后续的项目维护中，请确认当前问题是否能在POP10 Launcher3 / JrdLauncher, PIXI3-7S Launcher3重现，若重现，还请相互Merge代码。
+    Merge代码的Git命令：git cherry-pick  commitId
+例如：POP10上Launcher3的一个修改：
+    commit bb17ab15d0adf167428b015c55165c5f2cfb2dd8
+    Author: mingxiao.li <mingxiao.li@tcl.com>
+    Date:   Wed Jan 21 09:37:40 2015 +0800
+    ###%%%comment:[VDF][ACC1][13969][1a - Fatal]Screen rotation takes too long
+想Merge到Tint8 Launcher3，则：
+    git cherry-pick bb17ab15d0adf167428b015c55165c5f2cfb2dd8
+    git reset HEAD
+    git status --s        //此时能够看到Merge过来的修改
+注意：git cherry-pick 仅限于使用在当前git库下的分支。否则，会提示fatal: bad object错误。
 
 
 

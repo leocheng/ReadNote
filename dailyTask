@@ -5169,8 +5169,6 @@ recent:
 	    
 ./src/com/jrdcom/wifitransfer/ui/CreateOrModifyUser.java:341:                inflate.findViewById(R.id.select_from_gallery).setOnClickListener(
 
-
-
 培训：
     PackageManagerService$FileInstallArgs.copyApk()
 	
@@ -5180,22 +5178,293 @@ recent:
   周五：2015-01-23
 	任务：
 	–---------------------------------------------------------------------------	
+    PR： 905775 -- POP10 -- [Wifi-display]Wifi-transfer can not set photos via crop photo
+	参考资料：http://blog.csdn.net/tempersitu/article/details/20557383
+	代码地址：
 	
+	
+	PR: 886824 -- POP10 -- [Launcher]System cann't load menu
+流程：
+I/aidy    (19000): Launcher -- onPause()
+I/aidy    (19000): Launcher -- onStop()
+I/aidy    (19000): Launcher -- onDestroy()
+I/aidy    (19000): Launcher -- onCreate()
+I/aidy    (19000): Launcher -- onStart()
+I/aidy    (19000): Launcher -- onResume()
+I/aidy    (19000): Launcher -- showAllApps()
+I/aidy    (19000): Launcher -- showAppsCustomizeHelper()
+I/aidy    (19000): Workspace -- onResume()
+I/aidy    (19000): Launcher -- onBackPressed()
+I/aidy    (19000): Launcher -- showworkspace()
+I/aidy    (19000): Launcher -- onBackPressed()
+I/aidy    (19000): Launcher -- onBackPressed()
+I/aidy    (19000): Launcher -- onBackPressed()
+
+方式一：从AllApp入手开始查找
+
+方式二：从workspace的加载入手，关键在于view的添加部分
+Launcher.onBackPressed()
+    Launcher.showWorkspace(true)
+        hideAppsCustomizeHelper(Workspace.State.NORMAL, animated, false, onCompleteRunnable);
+            Workspace.getChangeStateAnimation(state, animated, delay, snapPage, null)
+
+kuaisu
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- state = NORMAL_HIDDEN
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- 3
+I/aidy    (14940): AlphaUpdateListener -- updateVisibility()
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- 6
+I/aidy    (14940): hideAppsCustomizeHelper() -- begin
+I/aidy    (14940): hideAppsCustomizeHelper() -- 1
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- state = NORMAL
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- 2
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- 4
+I/aidy    (14940): new LauncherViewPropertyAnimator() -- hotseat
+I/aidy    (14940): new AlphaUpdateListener()
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- 7
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- hotseatAlpha.isStarted()false
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- hotseatAlpha.isRunning()false
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- 5
+
+I/aidy    (14940): hideAppsCustomizeHelper() -- animated = true
+I/aidy    (14940): hideAppsCustomizeHelper() -- initialized = false
+I/aidy    (14940): hideAppsCustomizeHelper() -- 4
+
+
+
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- state = NORMAL_HIDDEN
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- 3
+I/aidy    (14940): AlphaUpdateListener -- updateVisibility()
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- 6
+I/aidy    (14940): hideAppsCustomizeHelper() -- begin
+I/aidy    (14940): hideAppsCustomizeHelper() -- 1
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- state = NORMAL
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- 2
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- 4
+I/aidy    (14940): new LauncherViewPropertyAnimator() -- hotseat
+I/aidy    (14940): new AlphaUpdateListener()
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- 7
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- hotseatAlpha.isStarted()false
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- hotseatAlpha.isRunning()false
+I/aidy    (14940): Workspace -- getChangeStateAnimation() -- 5
+
+I/aidy    (14940): hideAppsCustomizeHelper() -- animated = true
+I/aidy    (14940): hideAppsCustomizeHelper() -- initialized = true
+I/aidy    (14940): hideAppsCustomizeHelper() -- 3
+I/aidy    (14940): hideAppsCustomizeHelper() -- 5
+I/aidy    (14940): hideAppsCustomizeHelper() -- 6
+I/aidy    (14940): hideAppsCustomizeHelper() -- 7
+I/aidy    (14940): hideAppsCustomizeHelper() -- 8
+I/aidy    (14940): LauncherViewPropertyAnimator -- hotseat -- start()
+I/aidy    (14940): LauncherViewPropertyAnimator -- hotseat -- start() -- mAlpha = 1.0
+I/aidy    (14940): FirstFrameAnimatorHelper -- onAnimationUpdate()
+I/aidy    (14940): AlphaUpdateListener -- onAnimationStart()
+I/aidy    (14940): FirstFrameAnimatorHelper -- onAnimationUpdate()
+I/aidy    (14940): FirstFrameAnimatorHelper -- onAnimationUpdate()
+I/aidy    (14940): FirstFrameAnimatorHelper -- onAnimationUpdate()
+I/aidy    (14940): FirstFrameAnimatorHelper -- onAnimationUpdate()
+I/aidy    (14940): AlphaUpdateListener -- onAnimationEnd()
+I/aidy    (14940): AlphaUpdateListener -- updateVisibility()
+I/aidy    (14940): hideAppsCustomizeHelper() -- onAnimationEnd()
+
+
+原因：hideAppsCustomizeHelper()中获取根据AllButton获取initialized的值的时候，有可能为null
+LauncherModel.bindWorkspace() -- callbacks.startBinding();
+
+快速
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- type = 0
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- 2
+I/aidy    (17011): Hotseat -- onFinishInflate()
+I/aidy    (17011): Hotseat -- resetLayotut()
+I/aidy    (17011): Hotseat -- resetLayotut() -- 1
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- state = NORMAL_HIDDEN
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- 3
+I/aidy    (17011): AlphaUpdateListener -- updateVisibility()
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- 6
+
+I/aidy    (17011): hideAppsCustomizeHelper() -- begin
+I/aidy    (17011): hideAppsCustomizeHelper() -- 1
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- state = NORMAL
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- 2
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- 4
+I/aidy    (17011): new LauncherViewPropertyAnimator() -- hotseat
+I/aidy    (17011): new AlphaUpdateListener()
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- 7
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- hotseatAlpha.isStarted()false
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- hotseatAlpha.isRunning()false
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- 5
+
+I/aidy    (17011): hideAppsCustomizeHelper() -- animated = true
+I/aidy    (17011): hideAppsCustomizeHelper() -- initialized = false
+I/aidy    (17011): hideAppsCustomizeHelper() -- 4
+I/aidy    (17011): LauncherModel -- bindWorkspace()
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- type = 0
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- type = 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- type = 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- type = 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- type = 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- 1
+
+I/aidy    (17011): Launcher -- startBinding
+I/aidy    (17011): Hotseat -- resetLayotut()
+I/aidy    (17011): Hotseat -- resetLayotut() -- 1
+I/aidy    (17011): Hotseat -- resetLayotut() -- 2
+I/aidy    (17011): Launcher -- setAllAppsButton()
+
+
+
+慢速
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- type = 0
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- 2
+I/aidy    (17011): Hotseat -- onFinishInflate()
+I/aidy    (17011): Hotseat -- resetLayotut()
+I/aidy    (17011): Hotseat -- resetLayotut() -- 1
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- state = NORMAL_HIDDEN
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- 3
+I/aidy    (17011): AlphaUpdateListener -- updateVisibility()
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- 6
+I/aidy    (17011): LauncherModel -- bindWorkspace()
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- type = 0
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- type = 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- type = 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- type = 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- type = 1
+I/aidy    (17011): LauncherModel -- runOnMainThread() -- 1
+
+I/aidy    (17011): Launcher -- startBinding
+I/aidy    (17011): Hotseat -- resetLayotut()
+I/aidy    (17011): Hotseat -- resetLayotut() -- 1
+I/aidy    (17011): Hotseat -- resetLayotut() -- 2
+I/aidy    (17011): Launcher -- setAllAppsButton()
+
+I/aidy    (17011): hideAppsCustomizeHelper() -- begin
+I/aidy    (17011): hideAppsCustomizeHelper() -- 1
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- state = NORMAL
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- 2
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- 4
+I/aidy    (17011): new LauncherViewPropertyAnimator() -- hotseat
+I/aidy    (17011): new AlphaUpdateListener()
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- 7
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- hotseatAlpha.isStarted()false
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- hotseatAlpha.isRunning()false
+I/aidy    (17011): Workspace -- getChangeStateAnimation() -- 5
+
+I/aidy    (17011): hideAppsCustomizeHelper() -- animated = true
+I/aidy    (17011): hideAppsCustomizeHelper() -- initialized = true
+I/aidy    (17011): hideAppsCustomizeHelper() -- 3
+I/aidy    (17011): hideAppsCustomizeHelper() -- 5
+I/aidy    (17011): hideAppsCustomizeHelper() -- 6
+I/aidy    (17011): hideAppsCustomizeHelper() -- 7
+I/aidy    (17011): hideAppsCustomizeHelper() -- 8
+I/aidy    (17011): LauncherViewPropertyAnimator -- hotseat -- start()
+I/aidy    (17011): LauncherViewPropertyAnimator -- hotseat -- start() -- mAlpha = 1.0
+I/aidy    (17011): FirstFrameAnimatorHelper -- onAnimationUpdate()
+I/aidy    (17011): AlphaUpdateListener -- onAnimationStart()
+I/aidy    (17011): FirstFrameAnimatorHelper -- onAnimationUpdate()
+I/aidy    (17011): FirstFrameAnimatorHelper -- onAnimationUpdate()
+I/aidy    (17011): FirstFrameAnimatorHelper -- onAnimationUpdate()
+I/aidy    (17011): FirstFrameAnimatorHelper -- onAnimationUpdate()
+I/aidy    (17011): AlphaUpdateListener -- onAnimationEnd()
+I/aidy    (17011): AlphaUpdateListener -- updateVisibility()
+I/aidy    (17011): hideAppsCustomizeHelper() -- onAnimationEnd()
+
+原因：Launcher.hideAppsCustomizeHelper()中 initialized 的值需要根据 AllButton的状态来判断，
+在快速切换过程中，allutton的状态来不及改变，就会引发workspace中的view的显示状态发生变化
+存在异常时，LaunchModel的状态还是Load状态
+I/aidy    (25002): Launcher -- hideAppsCustomizeHelper() -- begin
+I/aidy    (25002): Launcher -- hideAppsCustomizeHelper() -- isAllAppsLoaded() = false
+I/aidy    (25002): Launcher -- hideAppsCustomizeHelper() -- isLoadingWorkspace() = true
+I/aidy    (25002): Launcher -- hideAppsCustomizeHelper() -- initialized() = false
+
+
+
+I/aidy    (25002): Launcher -- hideAppsCustomizeHelper() -- begin
+I/aidy    (25002): Launcher -- hideAppsCustomizeHelper() -- isAllAppsLoaded() = true
+I/aidy    (25002): Launcher -- hideAppsCustomizeHelper() -- isLoadingWorkspace() = false
+I/aidy    (25002): Launcher -- hideAppsCustomizeHelper() -- initialized() = true
+
+
+
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周一：2015-01-26
+	任务：
+	–---------------------------------------------------------------------------	
+	PR: 910143 -- POP10 -- [Launcher]The widget of photo gallery display abnormal
+	Gallery2:
+        <receiver android:name="com.android.gallery3d.gadget.PhotoAppWidgetProvider"
+                android:label="@string/appwidget_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                    android:resource="@xml/widget_info" />
+        </receiver>
+	
+	JrdLauncher:
+	    Launcher.onBackPressed()
+	    --> Workspace.showOutlinesTemporarily()
+	    --> SmoothPagedView.snapToPage(int)
+	    --> PagedView.snapToPage()
+	    --> LauncherScroller.startScoll()
+	    
+	    --> Workspace.screenScrolled()
+	        
+	
+I/aidy    (13299): onBackPressed()
+I/aidy    (13299): onBackPressed() -- 6
+I/aidy    (13299): Workspace -- showOutlinesTemporarily()
+I/aidy    (13299): SmoothPagedView -- snapToPage()
+I/aidy    (13299): SmoothPagedView -- snapToPage() -- 1
+I/aidy    (13299): PagedView -- snapToPage(int)
+I/aidy    (13299): PagedView -- snapToPage(int, int, int, boolean, TimeInterpolator)
+I/aidy    (13299): PagedView -- whichPage = 1 -- delta = 0 -- duration = 750 -- immediate = false
+I/aidy    (13299): PagedView -- sendScrollAccessibilityEvent() -- am.isEnabled() -- false
+I/aidy    (13299): LauncherScroller -- startScoll() -- startX = 811 -- startY = 0 -- dx = 0 -- dy = 0 -- duration = 750
+I/aidy    (13299): SmoothPagedView -- computeScroll()
+I/aidy    (13299): dispatchDraw()
+I/aidy    (13299): Workspace -- screenScrolled() -- screenCenter = 1211
+I/aidy    (13299): PagedView -- screenScrolled() -- screenCenter = 1211
+I/aidy    (13299): SmoothPagedView -- computeScroll()
+I/aidy    (13299): dispatchDraw()
+... ...
+I/aidy    (13299): SmoothPagedView -- computeScroll()
+I/aidy    (13299): PagedView -- sendScrollAccessibilityEvent() -- am.isEnabled() -- false
+I/aidy    (13299): dispatchDraw()
+	
+	
+	
+out/target/product/pop10/system/app/Gallery2/Gallery2.apk
+
+out/target/product/pop10/system/lib64/libjni_jpegstream.so
+
+LauncherModel -->bindWorkspace
+    --> bindWorkspaceItems(oldCallbacks, currentWorkspaceItems, currentAppWidgets, currentFolders, null);
+        --> Launcher.bindAppWidget(LauncherAppWidgetInfo)
+        
+        --> Workspace.addInScreen()
+        
+        
+9e49916f550b16607608e6f4340488ca1abf8746
+http://www.ed2000.com/FileList.asp?FileCategory=%E5%9B%BE%E4%B9%A6&SubCategory=%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%B8%8E%E7%BD%91%E7%BB%9C
+
+http://www.ed2000.com/FileList.asp?FileCategory=图书&SubCategory=计算机与网络
+
 	
 	疑难：
 	–---------------------------------------------------------------------------
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+  ==================================== 
+  周五：2015-01-23
+	任务：
+	–---------------------------------------------------------------------------		
 	
 	
 	
