@@ -13,6 +13,7 @@
     12、编译生成本地Android SDK
     13、进程间通信--binder
     14、泛型类设计
+    15、TextView实现过程
 
 
 
@@ -1042,6 +1043,78 @@ private void updateStateFromTypedArray(TypedArray a) {
 ===========================================
 14、泛型类设计
     泛型类：拥有一个或多个类型变量的类
+    
+===========================================
+15、TextView实现过程
+第一步 -- 测量
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int widthMode = MeasureSpec.getMode(widthMeasureSpec);
+        int heightMode = MeasureSpec.getMode(heightMeasureSpec);
+        int widthSize = MeasureSpec.getSize(widthMeasureSpec);
+        int heightSize = MeasureSpec.getSize(heightMeasureSpec);
+
+        int width;
+        int height;
+        ...
+        setMeasuredDimension(width, height);
+    }
+
+第二步 -- 布局
+    这一步主要针对ViewGroup, View可以不进行处理
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        if (mDeferScroll >= 0) {
+            int curs = mDeferScroll;
+            mDeferScroll = -1;
+            bringPointIntoView(Math.min(curs, mText.length()));
+        }
+    }
+
+第三步 -- 绘制
+    @Override
+    protected void onDraw(Canvas canvas) {
+        restartMarqueeIfNeeded();
+        super.onDraw(canvas);
+        ...
+        canvas.restore();
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
