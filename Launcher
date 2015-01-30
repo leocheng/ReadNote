@@ -11,6 +11,7 @@
     10、JrdLauncher Widget
     11、Launcher加载过程
     12、Launcher widget添加流程
+    13、动画
 
 ==========================================
 基本配置
@@ -1092,7 +1093,119 @@ Workspace.onPageEndMoving（）
     }
         
 ===========================================
+13、动画
+参考文档 http://blog.csdn.net/yuzhiboyi/article/details/7731826
+分类：
+    Tween Animation
+    Frame Animation
+    Property Animation -- 3.0以后引入
+    
+Tween Animation
+POP10 -- Launcher3/res/anim/task_open_enter.xml
+
+点击icon进入一个App时间播放的动画
+    <set xmlns:android="http://schemas.android.com/apk/res/android"
+            android:background="#ff000000" android:shareInterpolator="false" android:zAdjustment="top">
         
+        <!-- 透明度渐变 -->
+        <alpha android:fromAlpha="0" android:toAlpha="1.0"
+                android:fillEnabled="true" android:fillBefore="true" android:fillAfter="true"
+                android:interpolator="@interpolator/decelerate_quart"
+                android:startOffset="0"
+                android:duration="167"/>
+
+        <!-- App主界面从底部向上弹出，动画持续时间417毫秒 -->
+        <translate android:fromYDelta="110%" android:toYDelta="0"
+                android:fillEnabled="true" android:fillBefore="true" android:fillAfter="true"
+                android:interpolator="@interpolator/decelerate_quint"
+                android:startOffset="0"
+                android:duration="417" />
+    </set>
+
+调用：Launcher3/src/com/android/launcher3/Launcher.java
+    boolean startActivity(View v, Intent intent, Object tag) {
+            ...
+            ActivityOptions opts = ActivityOptions.makeCustomAnimation(this, R.anim.task_open_enter, R.anim.no_anim);
+            Bundle optsBundle = opts.toBundle();
+
+            startActivity(intent, optsBundle);
+            return true;
+    }
+
+Frame Animation
+Baidu音乐锁屏界面
+res/drawable/lock_anim.xml
+    <animation-list android:oneshot="false"
+        xmlns:android="http://schemas.android.com/apk/res/android">
+            <item android:duration="200" android:drawable="@drawable/ic_lockscreen_gif_first" />
+            <item android:duration="200" android:drawable="@drawable/ic_lockscreen_gif_second" />
+            <item android:duration="200" android:drawable="@drawable/ic_lockscreen_gif_third" />
+    </animation-list>
+
+    imageView.setBackgroundResource(R.drawable.drawable_anim);
+    anim = (AnimationDrawable) imageView.getBackground();
+    anim.start();
+
+Property Animation
+POP8_lte_global -- JrdLauncher
+打开文件夹动画，屏幕上推/下推过程
+src/com/jrdcom/launcher/JrdFolder.java
+    protected Animator onCreateOpeningAnimation() {
+        final DragLayer.LayoutParams folderLp = (DragLayer.LayoutParams) getLayoutParams();
+        final CellLayout screen = (CellLayout) mLauncher.getWorkspace().getChildAt(mLauncher.getCurrentWorkspaceScreen());
+
+        // 计算屏幕分割点
+        mOffset = folderLp.y;
+        // 计算Folder的上下点位置
+        int folderTop = folderLp.y;
+        int folderBottom = folderLp.y + folderLp.height;
+        int maxFolderBottom = mLauncher.getWorkspace().getDockIndicator().getBottom();
+        ...
+        
+        mUpTranslation = folderTop - mOffset;
+        mDownTranslation = folderBottom - mOffset;
+
+        ValueAnimator vAnimator = LauncherAnimUtils.ofFloat(1f);
+        vAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                float factor = (Float) animation.getAnimatedValue();
+                float upTransY = factor * mUpTranslation;
+                float downTransY = factor * mDownTranslation;
+                
+                screen.setChildrenTranslationYAndAlpha(mFolderIcon, 0f, mOffset, upTransY, downTransY);
+                mLauncher.getHotseat().getLayout().setChildrenTranslationYAndAlpha( mFolderIcon, 0f, mOffset, upTransY, downTransY);
+                mLauncher.getWorkspace().getDockIndicator().setAlpha(0f);
+                
+                folderLp.y = (int) (mOffset + upTransY);
+                folderLp.height = (int) (downTransY - upTransY);
+                setTop((int) (mOffset + upTransY));
+                setBottom((int) (mOffset + downTransY));
+            }
+        });
+        return vAnimator;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         
         
         

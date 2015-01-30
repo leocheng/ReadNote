@@ -5557,17 +5557,306 @@ index f238b4a..5e64f5d 100755
 WorkspaceIcon将以下属性关闭了
 <item name="customShadows">false</item>
 
+使用者：
+    R.layout.application
+./src/com/android/launcher3/Folder.java:1182:           child = mLauncher.createShortcut(R.layout.application, cellLayout,
+./src/com/android/launcher3/Workspace.java:2806:        View view = mLauncher.createShortcut(R.layout.application, target, (ShortcutInfo) info);
+./src/com/android/launcher3/Workspace.java:3971:        view = mLauncher.createShortcut(R.layout.application, cellLayout,
+./src/com/android/launcher3/Launcher.java:1512:         return createShortcut(R.layout.application,
+
+
 	
 	疑难：
 	–---------------------------------------------------------------------------
   ==================================== 
-  周五：2015-01-23
+  周三：20150128
+	任务：
+	–---------------------------------------------------------------------------	
+847852 -- 从该节点开始出现问题	
+出现一条
+	The new ref is updated by  with patch_delivery script!
+
+    ###%%%comment:Add the default_workspace,wallpaper,homescreen custom ###%%%bug
+    number:847852 ###%%%product name:MSM8916-L-POP10-VF-DINT ###%%%root
+    cause:Coding ###%%%project name:POP10 ###%%%module impact:Launcher3
+    ###%%%PERSO-RE-GENERATION:No ###%%%soluti
+
+    Branch: refs/heads/MSM8916-L-POP10-VF-DINT
+    http://10.128.161.209:8080/#change,73043
+    http://10.128.161.91/gitweb.cgi?p=quicl/platform/packages/apps/Launcher3.git;a=commit;h=ed421a782f111c469c1d75b33ad1ae7d79fc69e8
+
+出现两条
+commit 8c2e46029fc28222c67e85fabc471cfa71269fad
+Author: shuangli.liu <shuangli.liu@tcl.com>
+Date:   Wed Dec 10 18:49:29 2014 +0800
+
+    ###%%%comment:modify the workspace icon font blurry problem.
+    ###%%%bug number:859416
+    ###%%%product name:MSM8916-L-POP10-VF-DINT
+    ###%%%root cause:Coding
+    ###%%%project name:pop10
+    ###%%%module impact:Launcher3
+    ###%%%PERSO-RE-GENERATION:No
+    ###%%%solution:###%%%bug reason:###%%%test report:ok
+    ###%%%test suggestion:
+
+
+	Gallery2:
+        <receiver android:name="com.android.gallery3d.gadget.PhotoAppWidgetProvider"
+                android:label="@string/appwidget_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                    android:resource="@xml/widget_info" />
+        </receiver>
+	
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周四：20150129
+	任务：
+	–---------------------------------------------------------------------------
+	学习：进程间通信
+	
+	Linux进程间通信：
+	    父进程与子进程之间：管道、信号、跟踪
+	    兄弟进程之间：命名管道
+	在AT&T的UNIX系统新增（称为System V IPC）：报文队列、共享内存、信号量
+	BSD在System V IPC上新增：Socket
+	1）Service Manager与Binder之间的关系
+	Service Manager代码：framework/native/cmds/servicemanager/service_manager.c
+入口：main()方法，Service manager如何成为Binder的守护进程
+    int main(int argc, char **argv)
+    {
+        struct binder_state *bs;
+        
+        // 打开设备文件/dev/binder，建立128K内存映射
+        bs = binder_open(128*1024);
+
+        // 告诉Binder驱动它是守护进程
+        if (binder_become_context_manager(bs)) {
+            ALOGE("cannot become context manager (%s)\n", strerror(errno));
+            return -1;
+        }
+
+        // 进入循环，等待请求的到来
+        svcmgr_handle = BINDER_SERVICE_MANAGER;
+        binder_loop(bs, svcmgr_handler);
+
+        return 0;
+    }
+
+2）Binder机制中的Server端与Client端如何获得
+
+3）Server端启动过程
+    a) Server先获取Service Manager的接口defaultServiceManager
+    b) 将自己的Service添加到Service Manager中
+    c) 启动自己
+    
+    
+    
+    pr:885256 -- popkk -- [homo][recent app]the recent app display not beautiful
+    isdm值路径：/pop8_kk/soul45_wimdata_ng/wprocedures/mt6582_tablet_evbp1/plf/isdm_SystemUI.plf
+    将feature_systemui_speedUp改为1
+    id = recents_task_list
+    ./res/layout/tct_recents_activity.xml:74:	                       android:id="@+id/recents_task_list"
+    ./src/com/android/systemui/tctrecent/TctTaskPanel.java:198:        R.layout.tct_recents_activity, null, false);
+    ./res/values/dimens.xml:243:    <dimen name="tct_recents_list_panel_height">218dp</dimen>
+    
+    
+    ./src/com/android/systemui/tctrecent/TctTaskPanel.java:216:        
+                mTaskListViewController = new TctTaskListViewController(mContext, mRootView, this);
+    ./src/com/android/systemui/tctrecent/TctTaskListViewController.java:306:        
+                mTaskListView = (TctSwipeListView) mRootView.findViewById(R.id.recents_task_list);
+                
+                TctTaskListViewController$TaskListAdapter
+                        view = mInflater.inflate(R.layout.tct_recents_task_list_item, parent, false);
+                        
+                        
+            ./res/values/dimens.xml:238:         <dimen name="tct_recents_thumbnail_width">@android:dimen/thumbnail_width</dimen>
+                
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+	
+	
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周五：20150130
+	任务：
+	–---------------------------------------------------------------------------
+	//            boolean isCreate = !isShowing();
+//            if (isRotate && isShowing()) {
+//                Log.i("aidy", "show() -- 1");
+//                isCreate = true;
+//                onPause();
+//                onDestroy();
+//                TctPopupWindowRotationWatcher.getInstance().setOnRotationChangedListener(null);
+//                mWindowManager.removeView(mRootView);
+//                mContext.sendBroadcast(new Intent("com.android.systemui.showmenukey"));
+//                Log.i("aidy", "screen width = " + mWindowManager.getDefaultDisplay().getWidth());
+//            }
+	
+快 -- 第一次
+I/aidy    (20365): TctHorizontalListView -- onScroll()
+I/aidy    (20365): TctHorizontalListView -- onLayout()
+I/aidy    (20365): TctHorizontalListView -- removeNonVisibleItems()
+I/aidy    (20365): TctHorizontalListView -- fillList()
+I/aidy    (20365): TctHorizontalListView -- positionItems()
+
+I/aidy    (20365): TctHorizontalListView -- onScroll()
+I/aidy    (20365): TctHorizontalListView -- onLayout()
+I/aidy    (20365): TctHorizontalListView -- removeNonVisibleItems()
+I/aidy    (20365): TctHorizontalListView -- fillList()
+I/aidy    (20365): TctHorizontalListView -- positionItems()
+
+I/aidy    (20365): TctHorizontalListView -- onScroll()
+I/aidy    (20365): TctHorizontalListView -- onLayout()
+I/aidy    (20365): TctHorizontalListView -- removeNonVisibleItems()
+I/aidy    (20365): TctHorizontalListView -- fillList()
+I/aidy    (20365): TctHorizontalListView -- addAndMeasureChild()
+I/aidy    (20365): TctHorizontalListView -- positionItems()
+
+I/aidy    (20365): TctHorizontalListView -- onScroll()
+I/aidy    (20365): TctHorizontalListView -- onGestureListener -- onFling()
+I/aidy    (20365): TctHorizontalListView -- onFling() -- velocityX = -4791.9233 -- velocityY = -331.72284
+I/aidy    (20365): TctHorizontalListView -- onLayout()
+I/aidy    (20365): TctHorizontalListView -- removeNonVisibleItems()
+I/aidy    (20365): TctHorizontalListView -- fillList()
+I/aidy    (20365): TctHorizontalListView -- positionItems()
+		
+慢
+I/aidy    (20365): TctHorizontalListView -- onScroll()
+I/aidy    (20365): TctHorizontalListView -- onLayout()
+I/aidy    (20365): TctHorizontalListView -- removeNonVisibleItems()
+I/aidy    (20365): TctHorizontalListView -- fillList()
+I/aidy    (20365): TctHorizontalListView -- positionItems()
+
+I/aidy    (20365): TctHorizontalListView -- onScroll()
+I/aidy    (20365): TctHorizontalListView -- onLayout()
+I/aidy    (20365): TctHorizontalListView -- removeNonVisibleItems()
+I/aidy    (20365): TctHorizontalListView -- fillList()
+I/aidy    (20365): TctHorizontalListView -- addAndMeasureChild()
+I/aidy    (20365): TctHorizontalListView -- positionItems()
+I/aidy    (20365): TctHorizontalListView -- onGestureListener -- onFling()
+I/aidy    (20365): TctHorizontalListView -- onFling() -- velocityX = -5702.8857 -- velocityY = -268.58737
+I/aidy    (20365): TctHorizontalListView -- onLayout()
+I/aidy    (20365): TctHorizontalListView -- removeNonVisibleItems()
+I/aidy    (20365): TctHorizontalListView -- fillList()
+I/aidy    (20365): TctHorizontalListView -- positionItems()
+
+	
+	
+	功能介绍 --> Launcher的几个主要功能
+	    1、应用的呈列窗口以及进入通道
+	        1.1）进入通道，点击icon进入应用
+	        2.2）应用管理，查看应用信息，卸载App
+	    2、简要信息的展示平台，widget呈现简单的App交互
+	    3、隐性功能 --> 给用户一个好的平台体验
+	        3.1）wallpaper
+	        3.2）folder，归纳整理
+	        3.3）动画
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+	
+
+    项目建立 --> AndroidManifest.xml介绍
+    
+
+    项目架构 --> MVC模式
+
+    数据处理 --> 数据加载部分，LauncherModel
+
+    控件开发 --> 1）自定义View
+    控件开发 --> 2）view的拖动处理
+    数据存储 --> 数据库建立
+
+    动画效果 --> view的动画处理
+
+
+    网络处理 --> 在线壁纸，apk下载安装，卸载
+        okHttp介绍
+        netty使用
+
+    应用发布 --> 签名、发布
+        下载统计 
+	
+	
+操作系统排第一，Linux 排第二，计算机组成原理第三，数据结构第四，计算机网络第五。至于编程语言都是构建在这些知识之上的。
+
+引用一位老师的话：心态比能力重要，总结比苦干重要。同样，勤奋不能代替思考。我曾经看到过这样的一个故事，一个人为了学习更深入，花许多时间阅读一些大型项目代码并注释，将其实现细节一览无遗，学习了里面的每个步骤，明白了许多东西怎么做，但不知道为什么要这么做，可不可以不做或者换个方式做。
+	
+
+之后老大给我讲了一个故事，才发现自己的想法是多么的幼稚。就好比工作岗位，好的招人的工作岗位很多，但是能够去做的人却很少，为什么呢？主要的原因是技术水平不够。同样，“舞台从来就不缺，缺少的是能把戏演好的演员。”
+
+
+
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周一：20150204
+	任务：
+	–---------------------------------------------------------------------------	
+	
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周二：20150205
 	任务：
 	–---------------------------------------------------------------------------		
 	
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周三：20150206
+	任务：
+	–---------------------------------------------------------------------------			
+    2015年战役已经打响，为团结我军，取得最终胜利，TCL通讯平板业务中心员工沟通大会将在下周三举办！
+    大会地点：A9环形会议室
+    大会时间：2015年2月4日下午5:30-6:30	
+    
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周四：20150207
+	任务：
+	–---------------------------------------------------------------------------
 	
-	
-	
-	
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周五：20150208
+	任务：
+	–---------------------------------------------------------------------------
+
+
+ 
 	
 	

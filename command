@@ -472,7 +472,18 @@ Merge代码
 
 
 
+Wmd  sz的编译机制加了copy modem的功能，默认需要编译modem，不需要编译modem的话，请注释掉下面的行。
+Vim  build/core/main.mk + 1003
 
+#ying.pang for prebuild nonhlos begin
+ifneq ($(JRD_ALL_NONHLOS), true)
+droidcore: copy-nonhlos
+endif
+#ying.pang for prebuild nonhlos end
+
+注释掉 droidcore: copy-nonhlos即可
+或者仅仅编译android;
+./makeTcl –t  Pixi3_7_4G   JRD_ALL_NONHLOS=false new
 
 
 
