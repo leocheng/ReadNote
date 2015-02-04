@@ -14,6 +14,10 @@
     13、进程间通信--binder
     14、泛型类设计
     15、TextView实现过程
+    16、ContentProvider
+    17、BroadcastReceiver
+    18、Service
+    19、Activity
 
 
 
@@ -1045,6 +1049,60 @@ private void updateStateFromTypedArray(TypedArray a) {
     泛型类：拥有一个或多个类型变量的类
     
 ===========================================
+跳转到一个应用
+
+
+启动主Activity
+
+
+准备资源，绘制界面
+
+
+1）View
+    占据屏幕上的一块方形区域，在其上可进行绘制以及事件处理
+    所有的view在window中以属性结构排布
+
+
+framework/base/core/java/android/app/Activity.java
+    final void attach(...) {
+        mFragments.attachActivity(this, mContainer, null);
+        // 一个activity对应到一个Window
+        mWindow = PolicyManager.makeNewWindow(this);
+        // 设置该window的回调为该activity
+        mWindow.setCallback(this);
+        ...
+        
+        mUiThread = Thread.currentThread();
+        
+        mMainThread = aThread;
+        mInstrumentation = instr;
+        mApplication = application;
+        mIntent = intent;
+        mComponent = intent.getComponent();
+        mActivityInfo = info;
+        ...
+        // 保存WindowManager
+        mWindowManager = mWindow.getWindowManager();
+        
+    }
+
+
+
+
+
+scheduleTraversals()
+ViewRootImpl$TraversalRunnable -->doTraversal()
+
+
+2）ViewGroup
+
+
+
+3）TextView
+
+
+
+
 15、TextView实现过程
 第一步 -- 测量
     @Override
@@ -1080,8 +1138,238 @@ private void updateStateFromTypedArray(TypedArray a) {
         ...
         canvas.restore();
     }
+    
+===========================================
+16、ContentProvider
+
+查看data/data/com.jrdcom.launcher/databases/launcher.db文件的权限
+权限       所有者名称  所有者所在用户组名称
+-rw-rw---- u0_a21       u0_a21                491520 2015-01-30 08:51 launcher.db
+
+查看adb shell 所有进程信息
+所有者名称
+u0_a21    1256  149   747568 50064 ffffffff 4007f99c S com.jrdcom.launcher
+-->只有用户 u0_a21可以对launcher.db进行修改
+
+ 1）为什么要设计ContentProvider这种数据结构？
+    因为上述这种Linux的文件保护机制，使得应用程序之间文件的直接读写操作得到隔离，但同时也隔离
+了数据，无法将数据开放出去，典型的比如说联系人信息等等，那么就需要由一种设计能够对数据进行保护性的开放。
+ 同时，ContentProvider也能够将数据与业务进行友好的隔离
+ 
+ 2）ContentProvider共享数据的本质是什么，或者说ContentProvider是如何打破文件夹权限所带来的限制？
+    ContentProvider本质上是通过Binder进程间通信 + 共享内存，从而达到数据共享的目的。它通过将需要在
+ 进程间传输的数据写到共享内存中，然后通过使用Binder进程间通信机制将一个共享内存的打开文件描述符
+ 传递给对方，这样就能达到共享数据的目的
+ 
+ 3）ContentProvider的数据更新机制
+ 
+ 4）ContentProvider启动过程
+    4.1）获取ContentResolver
+    context.getContentResolver()
+frameworks/base/core/java/android/app/ContextImpl.java
+    @Override  
+    public ContentResolver getContentResolver() {  
+        return mContentResolver;  
+    }  
+    构造函数
+        private ContextImpl(ContextImpl container, ActivityThread mainThread,
+            LoadedApk packageInfo, IBinder activityToken, UserHandle user, boolean restricted,
+            Display display, Configuration overrideConfiguration) {
+            ...
+                    mContentResolver = new ApplicationContentResolver(this, mainThread, user);
+    }
+    
+    4.2）查询
+    mContentResolver.query(...) {
+        ...    
+        CursorWrapperInner wrapper = new CursorWrapperInner(qCursor, stableProvider != null ? stableProvider : 
+            acquireProvider(uri));
+        stableProvider = null;
+        qCursor = null;
+        return wrapper;
+    }
+    frameworks/base/core/java/android/app/ActivityThread.java
+        public final IContentProvider acquireProvider(Context c, String auth, int userId, boolean stable) {
+        // 如果已经存在，则从mProviderMap中返回对应的ContentProvider
+        final IContentProvider provider = acquireExistingProvider(c, auth, userId, stable);
+        if (provider != null) {
+            return provider;
+        }
+        
+        //从ActivityManagerService中获取ContentProvider
+        IActivityManager.ContentProviderHolder holder = null;
+        try {
+            holder = ActivityManagerNative.getDefault().getContentProvider(getApplicationThread(), auth, userId, stable);
+        } catch (RemoteException ex) {
+        }
+
+        // Install provider will increment the reference count for us, and break
+        // any ties in the race.
+        holder = installProvider(c, holder, holder.info,
+                true /*noisy*/, holder.noReleaseNeeded, stable);
+        return holder.provider;
+    }
+
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+
+    private final ContentProviderHolder getContentProviderImpl(IApplicationThread caller, String name, IBinder token, boolean stable, int userId) {
+        ContentProviderRecord cpr;
+        ContentProviderConnection conn = null;
+        ProviderInfo cpi = null;
+
+        synchronized(this) {
+            ProcessRecord r = null;
+            if (caller != null) {
+// 获取调用者的进程信息
+                r = getRecordForAppLocked(caller);
+            }
+
+            ...
+
+            boolean singleton;
+            if (!providerRunning) {
+                try {
+// 通过PMS获取ContentProvider的信息，安装APK时已保存ContentProvider的信息
+                    cpi = AppGlobals.getPackageManager().
+                        resolveContentProvider(name,STOCK_PM_FLAGS | PackageManager.GET_URI_PERMISSION_PATTERNS, userId);
+                    checkTime(startTime, "getContentProviderImpl: after resolveContentProvider");
+                } catch (RemoteException ex) {
+                }
+                // If the provider is a singleton AND
+                // (it's a call within the same user || the provider is a
+                // privileged app)
+                // Then allow connecting to the singleton provider
+                singleton = isSingleton(cpi.processName, cpi.applicationInfo,
+                        cpi.name, cpi.flags) && isValidSingletonCall(r.uid, cpi.applicationInfo.uid);
+                if (singleton) {
+                    userId = UserHandle.USER_OWNER;
+                }
+                cpi.applicationInfo = getAppInfoForUser(cpi.applicationInfo, userId);
+
+                ComponentName comp = new ComponentName(cpi.packageName, cpi.name);
+                checkTime(startTime, "getContentProviderImpl: before getProviderByClass");
+                cpr = mProviderMap.getProviderByClass(comp, userId);
+                checkTime(startTime, "getContentProviderImpl: after getProviderByClass");
+                final boolean firstClass = cpr == null;
+                if (firstClass) {
+                    final long ident = Binder.clearCallingIdentity();
+                    try {
+                        checkTime(startTime, "getContentProviderImpl: before getApplicationInfo");
+                        ApplicationInfo ai =
+                            AppGlobals.getPackageManager().getApplicationInfo(cpi.applicationInfo.packageName,STOCK_PM_FLAGS, userId);
+                        checkTime(startTime, "getContentProviderImpl: after getApplicationInfo");
+                        if (ai == null) {
+                            return null;
+                        }
+                        ai = getAppInfoForUser(ai, userId);
+                        cpr = new ContentProviderRecord(this, cpi, ai, comp, singleton);
+                    } catch (RemoteException ex) {
+                        // pm is in same process, this will never happen.
+                    } finally {
+                        Binder.restoreCallingIdentity(ident);
+                    }
+                }
+
+                // 查看ContentProvider是否已经被其它应用程序加载了
+                final int N = mLaunchingProviders.size();
+                int i;
+                for (i=0; i<N; i++) {
+                    if (mLaunchingProviders.get(i) == cpr) {
+                        break;
+                    }
+                }
+
+                // 如果没有被加载，则需要启动一个进程来启动对应的类
+                if (i >= N) {
+                    final long origId = Binder.clearCallingIdentity();
+
+                    try {
+                        // Content provider is now in use, its package can't be stopped.
+                        try {
+                            AppGlobals.getPackageManager().setPackageStoppedState(
+                                    cpr.appInfo.packageName, false, userId);
+                        } catch (RemoteException e) {
+                        } catch (IllegalArgumentException e) {
+                        }
+
+                        // Use existing process if already started
+
+                        ProcessRecord proc = getProcessRecordLocked(
+                                cpi.processName, cpr.appInfo.uid, false);
+                        if (proc != null && proc.thread != null) {
+                            checkTime(startTime, "getContentProviderImpl: scheduling install");
+                            proc.pubProviders.put(cpi.name, cpr);
+                            try {
+                                proc.thread.scheduleInstallProvider(cpi);
+                            } catch (RemoteException e) {
+                            }
+                        } else {
+// 启动一个新进程
+                            proc = startProcessLocked(cpi.processName, cpr.appInfo, false, 0, "content provider",
+                                    new ComponentName(cpi.applicationInfo.packageName, cpi.name), false, false, false);
+                        }
+                        cpr.launchingApp = proc;
+                        mLaunchingProviders.add(cpr);
+                    } finally {
+                        Binder.restoreCallingIdentity(origId);
+                    }
+                }
+
+                // Make sure the provider is published (the same provider class
+                // may be published under multiple names).
+                if (firstClass) {
+                    mProviderMap.putProviderByClass(comp, cpr);
+                }
+// 保存所有运行的ContentProvider进程
+                mProviderMap.putProviderByName(name, cpr);
+                conn = incProviderCountLocked(r, cpr, token, stable);
+                if (conn != null) {
+                    conn.waiting = true;
+                }
+            }
+        }
+// 涉及到进程间同步问题，等待新进程中的ContentProvider被加载起来
+        // Wait for the provider to be published...
+        synchronized (cpr) {
+            while (cpr.provider == null) {
+                if (cpr.launchingApp == null) {
+                    return null;
+                }
+                try {
+                    if (conn != null) {
+                        conn.waiting = true;
+                    }
+                    cpr.wait();
+                } catch (InterruptedException ex) {
+                } finally {
+                    if (conn != null) {
+                        conn.waiting = false;
+                    }
+                }
+            }
+        }
+        return cpr != null ? cpr.newHolder(conn) : null;
+    }
+
+ 
+===========================================
+17、BroadcastReceiver
+    为什么要设计BroadcastReceiver这种通信方式
 
 
+===========================================
+18、Service
+
+
+===========================================
+19、Activity
+
+    
+
+===========================================
+自身的短板：
+1）数据结构
+2）后台服务
 
 
 

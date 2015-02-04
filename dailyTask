@@ -5824,6 +5824,78 @@ I/aidy    (20365): TctHorizontalListView -- positionItems()
   周一：20150204
 	任务：
 	–---------------------------------------------------------------------------	
+	Wallpaper挂掉
+	切换步骤：
+	mWallpapersView = (LinearLayout) findViewById(R.id.wallpaper_list);
+	
+	图片点击事件：
+	        mThumbnailOnClickListener = new OnClickListener() {
+            public void onClick(View v) {
+                if (mActionMode != null) {
+                    // When CAB is up, clicking toggles the item instead
+                    if (v.isLongClickable()) {
+                        mLongClickListener.onLongClick(v);
+                    }
+                    return;
+                }
+                mSetWallpaperButton.setEnabled(true);
+                WallpaperTileInfo info = (WallpaperTileInfo) v.getTag();
+                if (info.isSelectable() && v.getVisibility() == View.VISIBLE) {
+//选择对应图片
+                    selectTile(v);
+                }
+                info.onClick(WallpaperPickerActivity.this);
+            }
+        };
+	添加View以及点击事件
+    private void populateWallpapersFromAdapter(ViewGroup parent, BaseAdapter adapter, boolean addLongPressHandler) {
+        for (int i = 0; i < adapter.getCount(); i++) {
+            FrameLayout thumbnail = (FrameLayout) adapter.getView(i, null, parent);
+            parent.addView(thumbnail, i);
+            WallpaperTileInfo info = (WallpaperTileInfo) adapter.getItem(i);
+            // 将信息关联到对应View中
+            thumbnail.setTag(info);
+            info.setView(thumbnail);
+            if (addLongPressHandler) {
+                addLongPressHandler(thumbnail);
+            }
+            thumbnail.setOnClickListener(mThumbnailOnClickListener);
+        }
+    }
+    选择对应图片
+	    private void selectTile(View v) {
+        if (mSelectedTile != null) {
+            mSelectedTile.setSelected(false);
+            mSelectedTile = null;
+        }
+        mSelectedTile = v;
+        v.setSelected(true);
+        mSelectedIndex = mWallpapersView.indexOfChild(v);
+        // TODO: Remove this once the accessibility framework and
+        // services have better support for selection state.
+        v.announceForAccessibility(
+                getString(R.string.announce_selection, v.getContentDescription()));
+    }
+class -- ResourceWallpaperInfo   
+        public void onClick(WallpaperPickerActivity a) {
+            Log.i("aidy", "ResourceWallpaperInfo -- onClick()");
+            
+            BitmapRegionTileSource.ResourceBitmapSource bitmapSource = new BitmapRegionTileSource.ResourceBitmapSource(
+                            mResources, mResId, BitmapRegionTileSource.MAX_PREVIEW_SIZE);
+            bitmapSource.loadInBackground();
+            
+            BitmapRegionTileSource source = new BitmapRegionTileSource(a, bitmapSource);
+            CropView v = a.getCropView();
+            v.setTileSource(source, null);
+            
+            Point wallpaperSize = WallpaperCropActivity.getDefaultWallpaperSize(a.getResources(), a.getWindowManager());
+            RectF crop = WallpaperCropActivity.getMaxCropRect(source.getImageWidth(), source.getImageHeight(),
+                    wallpaperSize.x, wallpaperSize.y, false);
+            v.setScale(wallpaperSize.x / crop.width());
+            v.setTouchEnabled(false);
+            a.setSystemWallpaperVisiblity(false);
+        }
+	
 	
 	疑难：
 	–---------------------------------------------------------------------------
@@ -5831,6 +5903,9 @@ I/aidy    (20365): TctHorizontalListView -- positionItems()
   周二：20150205
 	任务：
 	–---------------------------------------------------------------------------		
+	Git复习：
+	
+	
 	
 	疑难：
 	–---------------------------------------------------------------------------
@@ -5838,9 +5913,32 @@ I/aidy    (20365): TctHorizontalListView -- positionItems()
   周三：20150206
 	任务：
 	–---------------------------------------------------------------------------			
-    2015年战役已经打响，为团结我军，取得最终胜利，TCL通讯平板业务中心员工沟通大会将在下周三举办！
+    
+    1) 2015年战役已经打响，为团结我军，取得最终胜利，TCL通讯平板业务中心员工沟通大会将在下周三举办！
     大会地点：A9环形会议室
     大会时间：2015年2月4日下午5:30-6:30	
+    
+    2) Blog开源系统
+    
+    3) PR: -- POP8_LTE_DEV -- 923167 -- [HOMO][ALRU] few UI design elements is to close to other elemets
+    res/values-sw600-port
+        <dimen name="workspace_indicator_margin_bottom">84dp</dimen>
+    
+    4）POP10 -- 通知栏下拉动画
+    ./res/layout/status_bar_expanded_header.xml:94:        android:id="@+id/header_emergency_calls_only"
+    ./res/layout/status_bar_expanded.xml:124:              <include layout="@layout/status_bar_expanded_header" />
+    ./res/layout/super_status_bar.xml:77:                  <include layout="@layout/status_bar_expanded"
+    ./src/com/android/systemui/statusbar/phone/PhoneStatusBar.java:872:  R.layout.super_status_bar, null);
+    
+    锁屏界面：./res/layout/status_bar_expanded.xml:100:            android:id="@+id/notification_stack_scroller"
+    ./src/com/android/systemui/statusbar/phone/NotificationPanelView.java:197:                findViewById(R.id.notification_stack_scroller);
+
+    
+./src/com/android/systemui/statusbar/phone/NotificationPanelView.java:187:        mQsContainer = findViewById(R.id.quick_settings_container);
+./res/layout/qs_panel.xml:18:    android:id="@+id/quick_settings_container"
+    
+    
+    
     
 	疑难：
 	–---------------------------------------------------------------------------
@@ -5857,6 +5955,42 @@ I/aidy    (20365): TctHorizontalListView -- positionItems()
 	–---------------------------------------------------------------------------
 
 
- 
+ 	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周一：20150211
+	任务：
+	–---------------------------------------------------------------------------	
+	
+	
+	
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周二：20150212
+	任务：
+	–---------------------------------------------------------------------------		
+	
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周三：20150213
+	任务：
+	–---------------------------------------------------------------------------			
+
+    
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周四：20150214
+	任务：
+	–---------------------------------------------------------------------------
+	
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周五：20150215
+	任务：
+	–---------------------------------------------------------------------------
 	
 	

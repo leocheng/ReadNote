@@ -115,21 +115,100 @@ repo sync -->同步整个工程的代码
 repo sync packages/apps/Settings/ -->下载某个模块的代码
 
 ===============================
-在Gerrit上面提交Reviewer，等待检查结果即可
-打开图形工具GITK查阅提交历史：gitk
+Git
 
-(1) git checkout
-恢复某个已修改的文件（撤销未提交的修改）：
-$ git checkout file-name
+1）查看log
+    git log
+    git log --stat                  查看每次的提交记录以及文件变更记录
+    git log -5                      显示最近的5条log
+    git log -p                      显示log以及详细修改的内容，与上一条可以结合使用
+    git log --stat                  显示log以及修改的文档，与上上一条可以结合使用
+    git show <commit id>            显示对应修改记录的详细修改
+    git show <commit id> --stat     显示对应修改记录的概要信息
 
-例如：git checkout src/com/android/.../xxx.java
+2）查看修改
+    git diff                        与暂存区比较
+    git diff HEAD                   与版本库比较
+    git diff --cached               暂存区与版本库比较
+    git diff <commit_1> <commit_2>  查看 commit_1 与 commit_2 之间的修改内容
+     
+3）查看文件的变动
+    git status
+    git status -s                   查看精简模式的修改   
 
-比如修改的都是java文件，不必一个个撤销，可以使用
+4）撤销、重置
+    git checkout                    汇总显示工作区、暂存区与HEAD之间的差异
+    git checkout file_1 file_2      工作区的修改被暂存区的内容替换
+    git checkout HEAD               用版本库的内容替换暂存区以及工作区的修改
+    git reset
+    git reset -- filename
+    git reset HEAD                  暂存区被版本库替换，回撤添加到暂存区的内容，工作区不变
+    git reset HEAD^                 工作区不变，暂存区与引用都回撤一次
+    git reset --soft <commit>       暂存区和工作区不变，引用切换到对应的指引
+    git reset --soft HEAD^          暂存区和工作区不变，引用回撤一次
+    git reset --hard <commit>       暂存区和工作区改变、引用都切换到对应的指引
 
-$ git checkout *.java
+5）查看提交
+    git show <commit>               查看对应的提交内容
 
-撤销所有修改
-$ git checkout .
+6）分支
+    git branch -a                   查看所有分支
+    git branch -v                   查看当前所在分支，以及最近的一次提交
+    
+    git checkout branch_name        切换到分支 branch_name
+    git checkout -b new_branch_name 拉新分支
+
+7）保存进度
+    git stash                       保存当前的工作区和暂存区的进度
+    git stash list                  显示进度列表
+    git stash pop                   从最近的保存的进度恢复，同时移除stash列表中的最新一条记录
+    git stash apply                 从最近的保存的进度恢复，但不会移除stash列表中的记录
+    git stash drop <stash>          删除某个存储的进度，默认为最近的一个进度
+    git stash clear                 删除所有的存储的进度
+    
+8）删除
+    删除未被add的文件
+    git clean -n                    显示将要删除的文件和目录
+    git clean -f                    删除未被 add 的文件
+    git clean -df                   删除未被 add 的文件和目录
+    删除已添加的文件
+    git rm file_1 file_2
+    
+9）打Tag
+    git tag -m "comment"
+    
+10）添加
+    git add -u                      添加所有文件
+    git add -i                      选择性添加
+    
+11）提交
+    git commit -m "comment"
+    git commit --amend -m "comment"
+    
+12）移动、改名
+    git mv file_old_name new_name   改名
+    
+13）文件忽略
+    设置全局忽略文件
+    git config --global core.excludesfile /data/nishome/tdsw1/mingxiao.li/projects/my_gitignore
+    
+14）克隆
+    git clone https://github.com/AidyGo/netty.git
+    git pull
+    git push 
+    
+    
+    
+15）rev-parse
+    git rev-parse --symbolic --branches     显示分支
+    git rev-parse --symbolic --tags         显示tag
+    git rev-parse --symbolic --glob=refs/*  显示tag
+    
+16）文件追溯
+    git blame file_name             显示文件的每一行是在什么时候引入的
+    git blame -L 6,+5 file_name     只追踪某几行的记录
+    
+
 (2) git revert
 
 撤销某次操作，此次操作之前和之后的commit和history都会保留，并且把这次撤销
@@ -154,6 +233,10 @@ git stash pop 恢复工作区内容
     
 4) 切换分支
     git checkout -b 本地分支名 远程分支名
+    
+ 
+    
+    
 ===============================
 搜索引擎搜索
 1）逻辑操作符
