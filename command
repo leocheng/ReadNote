@@ -234,7 +234,20 @@ git stash pop 恢复工作区内容
 4) 切换分支
     git checkout -b 本地分支名 远程分支名
     
- 
+ 查看当前的远程库：
+	git remote
+
+添加远程仓库：
+	git remote add [shortname] [url]
+
+从远程仓库抓取数据：
+	git fetch [remote-name]
+
+推送数据到远程仓库:
+	git push [remote-name] [branch-name]
+
+查看远程仓库信息：
+	git remote show [remote-name]
     
     
 ===============================
@@ -499,7 +512,7 @@ Comment中添加备注
     
 ===================================
 PR格式
-    // [BUGFIX]-Modify-Begin by mingxiao.li,12/03/2014,PR-840720
+    // [BUGFIX]-Modify-Begin by mingxiao.li,12/03/2014,PR:840720
 
 ===================================
 POP10独立APK编译

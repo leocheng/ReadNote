@@ -55,7 +55,12 @@
 	三级部门：RD
 	四级部门：Software
 
-12) 刘双丽
+12) 服务器
+    帐号：10.128.161.140
+  	帐号：mobile#3
+  	挂载到
+    
+    
 	密码：ssh -l shuangli.liu 10.128.161.138
 	帐号：mobile#3
 	挂载：sshfs shuangli.liu@10.128.161.138:/home/shuangli.liu /data/nishome/tdsw1/mingxiao.li/Server/

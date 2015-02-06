@@ -1049,7 +1049,12 @@ private void updateStateFromTypedArray(TypedArray a) {
     泛型类：拥有一个或多个类型变量的类
     
 ===========================================
-跳转到一个应用
+从桌面启动一个应用 -- 见文件 view.vpp
+    相当于在新的进程中启动该应用的mainActivity
+    主要分为3步：
+        1）对launcher发出的Intent进行解析，获取目标信息
+        2）暂停当前的activity(当前为Launcher)
+        3）创建一个新进程，启动目标Activity
 
 
 启动主Activity

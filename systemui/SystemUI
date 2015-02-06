@@ -1,0 +1,46 @@
+
+问题：
+    1）SystemUI与普通应用是如何同处一个界面的
+    
+
+
+功能：
+    USB
+    StatusBar
+    屏幕锁
+    
+
+Application:                    .SystemUIApplication
+
+Activity:                       .usb.UsbStorageActivity
+                                .usb.UsbConfirmActivity
+                                .usb.UsbPermissionActivity
+                                .usb.UsbResolverActivity
+                                .usb.UsbAccessoryUriActivity
+                                .usb.UsbDebuggingActivity
+                                
+                                .recent.RecentsActivity
+                                .recents.RecentsActivity
+                                
+                                .DessertCase
+                                .egg.LLandActivity
+                                .net.NetworkOverLimitActivity
+                                .media.MediaProjectionPermissionActivity
+                                .Somnambulator
+                                .settings.BrightnessDialog
+                                .temperatureprotect.WarningDialog
+                                com.android.internal.app.ExternalMediaFormatActivity
+
+Service:                        .SystemUIService
+                                .LoadAverageService
+                                .ImageWallpaper
+                                .screenshot.TakeScreenshotService
+                                .DessertCaseDream
+                                .keyguard.KeyguardService
+                                .doze.DozeService
+
+Receiver                        .BootReceiver
+                                .recent.RecentsPreloadReceiver
+                                .qs.tiles.HotspotTile$APChangedReceiver
+
+

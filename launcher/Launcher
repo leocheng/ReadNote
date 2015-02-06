@@ -12,6 +12,7 @@
     11、Launcher加载过程
     12、Launcher widget添加流程
     13、动画
+    14、POP10 Launcher3打开左滑开关
 
 ==========================================
 基本配置
@@ -1186,9 +1187,11 @@ src/com/jrdcom/launcher/JrdFolder.java
         return vAnimator;
     }
 
-
-
-
+===========================================
+14、POP10 Launcher3打开左滑开关
+    protected boolean hasCustomContentToLeft() {
+        return Settings.System.getInt(getContentResolver(),"enable_launch_app",1) == 1;
+    }
 
 
 
