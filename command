@@ -520,7 +520,9 @@ POP10独立APK编译
 ===================================
 ubuntu下SourceInsight打开失败
     删除%HOME/Soutce Insight/Settings下的所有文件
-    
+
+ubuntu 全部的窗口的关闭按钮，最大化、最小化按钮消失的解决办法
+    在命令窗口运行：metacity --replace
     
 ===================================
 EPas填写

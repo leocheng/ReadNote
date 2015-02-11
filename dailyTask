@@ -5963,9 +5963,235 @@ class -- ResourceWallpaperInfo
     领取负责人：招商银行高新园支行工作人员
     复印一份身份证复印件
     
+    PR： 922717 -- POP10 -- [3rdPartyAPK]We have to click back key twice to exit Filpboard after rotate the tablet.
+    复现路径：Launcher界面右滑进入Flipboard界面，转屏，点击返回键，查看是否需要返回两次
+    产生原因：进入Flipboard界面后转屏，Launcher的Activity会记录当前的状态，然后从Task中销毁。
+            点击第一次back键时，Launcher重起生命周期，然后根据上次记录的状态，
+            再次进入到Flipboard界面，造成Flipboard界面再次出现
+    处理结果：重新恢复Launcher的生命周期时，如果之前的状态是Flipboard，则从默认界面恢复
+    潜在影响：无
 
 
 
+ 	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周一：20150211
+	任务：
+	–---------------------------------------------------------------------------	
+	Service -- 生命周期
+	
+	http://www.csdn.net/article/2015-02-06/2823866
+要积极主动，没人关心你的职业生涯，相对你所做的事情，也没人关心你转多少钱，要自己想要的，否则你就完全偏离方向
+	
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周二：20150212
+	任务：
+	–---------------------------------------------------------------------------		
+	《JAVA虚拟机》
+    《重构》
+        在不改便软件可观察行为的前提下，调整其结构
+    目的：使软件更容易被理解和修改
+    
+    面向对象要点：
+        将数据和对数据的操作封装在一起
+	
+	visio + relational rose
+
+单一原则
+开放-封闭原则
+依赖倒转原则
+	
+设计模式：
+    1）简单工厂：将数据操作工厂化，根据输入的数据，由工厂自动组装成不同的对象，获取不同的结果
+        比如说客户端输入两个数a、b以及对应的运算符号，工厂自动返回运算结果结果，外界不用管加减层。
+        但此时工厂类之中依旧包含对应的简单逻辑
+	2）策略模式：针对每个策略，执行不同的算法，可与工厂方法相配合
+	
+	
+	6）装饰模式：房间需要什么，对应的提供者就能为其装饰什么
+	7）代理模式：被代理者将其可代理的行为抽象出一个接口，代理者实现该接口，对外值暴露该代理者
+	8）工厂方法：将简单工厂中的逻辑判断部分进行抽象，分离出一个接口，
+	9）原型模式：
+	
+	状态模式：每个特定的状态只处理当前状态下的任务
+	
+	
+	
+SystemUI状态栏：
+布局：
+最顶上一栏：com.android.systemui:id/status_bar
+com.android.systemui:id/notification_panel
+通知栏HEADER部分：com.android.systemui:id/header
+通知栏：com.android.systemui:id/notification_container_parent
+下拉展开部分：./res/layout/qs_panel.xml:18:    android:id="@+id/quick_settings_container"
+
+./res/layout-sw600dp/jrd_status_bar_expanded.xml:24:            android:id="@+id/notification_panel"
+./res/layout-sw600dp/jrd_status_bar_expanded_header.xml:22:     android:id="@+id/header"
+./res/layout-sw600dp/jrd_status_bar_expanded.xml:57:            android:id="@+id/notification_container_parent"
+
+
+HEAD：
+布局
+./res/layout-sw600dp/jrd_status_bar_expanded_header.xml:22:     android:id="@+id/header"
+./res/layout-sw600dp/jrd_status_bar_expanded.xml:124:           <include layout="@layout/jrd_status_bar_expanded_header" />
+StatusBarHeaderView：
+./src/com/android/systemui/statusbar/phone/PhoneStatusBar.java:1020:        
+        mHeader = (StatusBarHeaderView) mStatusBarWindow.findViewById(R.id.header);
+	
+./res/layout-sw600dp/jrd_super_status_bar.xml:77:               <include layout="@layout/jrd_status_bar_expanded"	
+
+
+./src/com/android/systemui/statusbar/phone/PhoneStatusBar.java:869:      R.layout.jrd_super_status_bar, null);
+
+SystemUI启动过程：
+-->
+SystemServer{
+    // 启动SystemUI中的Service
+    static final void startSystemUi(Context context) {
+        Intent intent = new Intent();
+        intent.setComponent(new ComponentName("com.android.systemui", "com.android.systemui.SystemUIService"));
+        context.startServiceAsUser(intent, UserHandle.OWNER);
+    }
+}
+
+-->
+SystemUIService extends Service {
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        // 启动所有相关的服务
+        ((SystemUIApplication) getApplication()).startServicesIfNeeded();
+    }
+}
+
+-->
+SystemUIApplication extends Application {
+
+    private static final String TAG = "SystemUIService";
+    private static final boolean DEBUG = false;
+
+    /**
+     * The classes of the stuff to start.
+     */
+    private final Class<?>[] SERVICES = new Class[] {
+            com.android.systemui.keyguard.KeyguardViewMediator.class,
+            com.android.systemui.recent.Recents.class,
+            com.android.systemui.volume.VolumeUI.class,
+            com.android.systemui.statusbar.SystemBars.class,
+            com.android.systemui.usb.StorageNotification.class,
+            com.android.systemui.power.PowerUI.class,
+            com.android.systemui.media.RingtonePlayer.class
+    };
+    
+    // 启动上述Service
+    public void startServicesIfNeeded() {
+        final int N = SERVICES.length;
+        for (int i=0; i<N; i++) {
+            Class<?> cl = SERVICES[i];
+            mServices[i] = (SystemUI)cl.newInstance();
+            mServices[i].mContext = this;
+            mServices[i].mComponents = mComponents;
+            mServices[i].start();
+
+            if (mBootCompleted) {
+                mServices[i].onBootCompleted();
+            }
+        }
+        mServicesStarted = true;
+    }
+
+-->
+SystemBars extends SystemUI implements ServiceMonitor.Callbacks {
+
+    @Override
+    public void start() {
+        mServiceMonitor = new ServiceMonitor(TAG, DEBUG, mContext, Settings.Secure.BAR_SERVICE_COMPONENT, this);
+        // 如果没有发相远程服务，将会调用
+        mServiceMonitor.start();
+    }
+
+    public void onNoService() {
+        createStatusBarFromConfig();  // fallback to using an in-process implementation
+    }
+    
+    通过放射启动PhoneStatusBar.start()
+    // config.xml
+    // <string name="config_statusBarComponent" translatable="false">com.android.systemui.statusbar.phone.PhoneStatusBar</string>
+    private void createStatusBarFromConfig() {
+        final String clsName = mContext.getString(R.string.config_statusBarComponent);
+        Class<?> cls = null;
+        cls = mContext.getClassLoader().loadClass(clsName);
+        mStatusBar = (BaseStatusBar) cls.newInstance();
+        mStatusBar.mContext = mContext;
+        mStatusBar.mComponents = mComponents;
+        mStatusBar.start();
+    }
+}
+
+-->
+PhoneStatusBar {
+    start() {
+        super.start(); // calls createAndAddWindows()
+    }
+    
+    public void createAndAddWindows() {
+        addStatusBarWindow();
+    }
+    
+    private void addStatusBarWindow() {
+        makeStatusBarView();
+        mStatusBarWindowManager = new StatusBarWindowManager(mContext);
+        mStatusBarWindowManager.add(mStatusBarWindow, getStatusBarHeight());
+    }
+    
+    protected PhoneStatusBarView makeStatusBarView() {
+        ...
+        if (isMSim()) {
+            mStatusBarWindow = (StatusBarWindowView) View.inflate(context, R.layout.msim_super_status_bar, null);
+        } else {
+            if(mContext.getResources().getBoolean(R.bool.feature_systemui_jrd_notification_on)){
+                mStatusBarWindow = (StatusBarWindowView) View.inflate(context, R.layout.jrd_super_status_bar, null);
+            }else{
+                mStatusBarWindow = (StatusBarWindowView) View.inflate(context, R.layout.super_status_bar, null);
+            }
+        }
+        ...
+    }
+}
+
+
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周三：20150213
+	任务：
+	–---------------------------------------------------------------------------			
+    
+./src/com/jrdcom/launcher/DeleteDropTarget.java:86:        
+    mRemoveDrawable = (TransitionDrawable) r.getDrawable(R.drawable.remove_target_selector);
+./res/layout/drop_target_bar.xml:26:            android:drawableStart="@drawable/remove_target_selector" />
+./res/layout/search_drop_target_bar.xml:31:            layout="@layout/drop_target_bar" />    
+    
+    
+    
+    
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周四：20150214
+	任务：
+	–---------------------------------------------------------------------------
+	
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周五：20150215
+	任务：
+	–---------------------------------------------------------------------------
 
  	疑难：
 	–---------------------------------------------------------------------------
@@ -6004,5 +6230,4 @@ class -- ResourceWallpaperInfo
   周五：20150215
 	任务：
 	–---------------------------------------------------------------------------
-	
 	

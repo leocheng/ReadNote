@@ -16,7 +16,7 @@
     15、TextView实现过程
     16、ContentProvider
     17、BroadcastReceiver
-    18、Service
+    18、Service生命周期
     19、Activity
 
 
@@ -1363,8 +1363,38 @@ frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
 
 
 ===========================================
-18、Service
+18、Service生命周期
+1）startService()，之后stopService()
+    onCreate() --> onStartCommand() --> onStart() -- onDestroy()
 
+2）bindService()
+   此时stopService()无效
+   必须unbindService()，或者Activity被销毁，直接进入onUnbind() --> onDestroy()
+    onCreate() --> onBind() --> onUnbind() --> onDestroy()
+
+3）先startService()，再bindService()
+    此时stopService()同样无效
+    必须先unbindService()，或Activity被销毁，进入onUnbind()，此时点击stopService()才会生效进入onDestroy()
+    onCreate() --> StartCommand() --> onStart() --> onBind() --> onUnbind() --> onDestroy()
+
+4）先bindService()，再startService()
+    此时stopService同样无效
+    必须unbindService()，进入onUnbind()，然后stopService()进入onDestroy()
+    onCreate() --> onBind() --> StartCommand() --> onStart() --> onUnbind() --> onDestroy()
+
+宗上:
+    1) 任何一个Service都潜在的允许被绑定，并且允许被多个Activity绑定，而且只有在多个绑定都解绑的情况下，
+此时调用stopService()系统才会销毁它
+    2) 在整个生命周期中，onCreate()和onDestroy()只会被调用一次
+    
+Activity 与 Service 通信方式
+1）本地广播，这种情况下，不管是哪种启动方式，只要Service启动了，就会收到广播，执行相应的操作
+2）在bindService()的情况下，通过Binder进行通信，创建一个接口并由Binder实现，activity与service之间的通信由该接口操作
+3）在bindService()的情况下，通过Messenge传递Message来进行通信，本质上是由Binder进行传递
+
+为什么要如此设计：
+    
+    
 
 ===========================================
 19、Activity
