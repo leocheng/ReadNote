@@ -5399,6 +5399,8 @@ I/aidy    (25002): Launcher -- hideAppsCustomizeHelper() -- initialized() = true
 	任务：
 	–---------------------------------------------------------------------------	
 	PR: 910143 -- POP10 -- [Launcher]The widget of photo gallery display abnormal
+	
+	android:layerType=""
 	Gallery2:
         <receiver android:name="com.android.gallery3d.gadget.PhotoAppWidgetProvider"
                 android:label="@string/appwidget_title">
@@ -6185,6 +6187,25 @@ PhoneStatusBar {
   周四：20150212
 	任务：
 	–---------------------------------------------------------------------------
+	user_folder.xml
+	
+	跟踪：930714
+
+#include <stdio.h>
+
+void main() {
+    printf("hello world\n");
+}
+
+gcc -o hello hello.c
+
+	源程序  hello.c	
+	预处理器(cpp)：处理以字符#开头的命令，读取stdio.h文件中的内容，插入到上述文本中，得到另一个文件hello.i
+	编译器(ccl)：将hello.i文件翻译成汇编程序hello.s，汇编语言程序中的每条指令都以一种标准的文本格式确切的描述了一条低级机器语言指令
+	汇编器(as)：将hello.s翻译成机器语言指令，并将这些指令打包成一种叫做可重定位目标程序的格式，并将结构保存在目标文件 hello.o 中
+	链接器(ld)：printf()函数位于单独的printf.o预编译目标文件中，链接器需要将其已某种方式并如到hell.o程序中，最终得到一个可执行目标文件hello
+	
+	
 	
 	疑难：
 	–---------------------------------------------------------------------------
@@ -6193,6 +6214,50 @@ PhoneStatusBar {
 	任务：
 	–---------------------------------------------------------------------------
     填写EPAS
+    
+02-09 15:49:58.988 W/OpenGLRenderer( 4801): Incorrectly called buildLayer on View: ShortcutAndWidgetContainer, destroying layer...
+    
+
+02-09 15:51:25.235 I/Timeline( 4801): Timeline: Activity_idle id: android.os.BinderProxy@74a06a3 time:20738460
+
+
+02-09 15:51:26.007 W/Launcher( 4801): setApplicationContext called twice! old=com.android.launcher3.LauncherApplication@19f46b0a new=com.android.launcher3.LauncherApplication@19f46b0a
+02-09 15:51:26.112 D/Launcher( 4801): 11683562 - bindAddScreens()
+02-09 15:51:26.112 D/Launcher( 4801): 11683562 -   orderedScreenIds: 1, 2, 3
+02-09 15:51:26.112 D/Launcher.Workspace( 4801): 11683562 - insertNewWorkspaceScreen(): 1 at index: 0
+02-09 15:51:26.114 D/Launcher.Workspace( 4801): 11683562 - insertNewWorkspaceScreen(): 2 at index: 1
+
+02-09 15:51:26.761 I/Choreographer( 4801): Skipped 52 frames!  The application may be doing too much work on its main thread.
+
+02-09 15:51:27.199 I/Timeline( 4801): Timeline: Activity_idle id: android.os.BinderProxy@74a06a3 time:20740424
+
+
+02-09 15:54:36.002 E/audio_a2dp_hw(  294): adev_set_parameters: ERROR: set param called even when stream out is null
+02-09 15:54:36.014 E/ActivityThread( 4801): Performing stop of activity that is not resumed: {com.android.launcher3/com.android.launcher3.Launcher}
+02-09 15:54:36.014 E/ActivityThread( 4801): java.lang.RuntimeException: Performing stop of activity that is not resumed: {com.android.launcher3/com.android.launcher3.Launcher}
+02-09 15:54:36.014 E/ActivityThread( 4801): 	at android.app.ActivityThread.performStopActivityInner(ActivityThread.java:3309)
+02-09 15:54:36.014 E/ActivityThread( 4801): 	at android.app.ActivityThread.handleStopActivity(ActivityThread.java:3390)
+02-09 15:54:36.014 E/ActivityThread( 4801): 	at android.app.ActivityThread.access$1100(ActivityThread.java:144)
+02-09 15:54:36.014 E/ActivityThread( 4801): 	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:1307)
+02-09 15:54:36.014 E/ActivityThread( 4801): 	at android.os.Handler.dispatchMessage(Handler.java:102)
+02-09 15:54:36.014 E/ActivityThread( 4801): 	at android.os.Looper.loop(Looper.java:135)
+02-09 15:54:36.014 E/ActivityThread( 4801): 	at android.app.ActivityThread.main(ActivityThread.java:5221)
+02-09 15:54:36.014 E/ActivityThread( 4801): 	at java.lang.reflect.Method.invoke(Native Method)
+02-09 15:54:36.014 E/ActivityThread( 4801): 	at java.lang.reflect.Method.invoke(Method.java:372)
+02-09 15:54:36.014 E/ActivityThread( 4801): 	at com.android.internal.os.ZygoteInit$MethodAndArgsCaller.run(ZygoteInit.java:898)
+02-09 15:54:36.014 E/ActivityThread( 4801): 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:693)
+02-09 15:54:36.015 E/WifiStateMachine(  961): handleMessage: X
+02-09 15:54:36.015 E/WifiStateMachine(  961): handleMessage: E msg.what=131127
+02-09 15:54:36.015 E/WifiStateMachine(  961): processMsg: ConnectedState
+02-09 15:54:36.016 E/WifiStateMachine(  961): processMsg: L2ConnectedState
+02-09 15:54:36.016 E/WifiStateMachine(  961): processMsg: ConnectModeState
+02-09 15:54:36.016 E/WifiStateMachine(  961): handleMessage: X
+02-09 15:54:36.016 E/WifiStateMachine(  961): handleMessage: E msg.what=131158
+02-09 15:54:36.016 E/WifiStateMachine(  961): processMsg: ConnectedState
+02-09 15:54:36.017 E/WifiStateMachine(  961): processMsg: L2ConnectedState
+02-09 15:54:36.017 E/WifiStateMachine(  961): processMsg: ConnectModeState
+02-09 15:54:36.017 E/WifiStateMachine(  961): processMsg: DriverStartedState
+    
 
  	疑难：
 	–---------------------------------------------------------------------------
@@ -6200,8 +6265,11 @@ PhoneStatusBar {
   周日：20150215
 	任务：
 	–---------------------------------------------------------------------------	
-	加班
-	年会：
+	1）年会：后海地铁站D1出口
+	
+	2）PR：928184 -- POP10 -- [Launcher]Screen freeze after exit the camera
+	
+	
 	
 
  	疑难：
@@ -6210,20 +6278,124 @@ PhoneStatusBar {
   周一：20150211
 	任务：
 	–---------------------------------------------------------------------------	
-	
-	
-	
+	PR: 910143 -- POP10 -- [Launcher]The widget of photo gallery display abnormal
+	    已解决，为该空间添加软件加速：
+	     <StackView
+             android:id="@+id/appwidget_stack_view"
+             android:layout_width="match_parent"
+             android:layout_height="match_parent"
+             android:loopViews="true"
+             <!--解决方式：为StackView添加如下属性-->
+             android:layerType="software" />
+
+滑动StackView有一个轮播的动画效果，此处需要进行硬件加速
+
+为什么使用硬件加速？
+如果软件使用了硬件加速的话，硬件层能够带来更为快速和更为平滑的动画效果。
+当对一个复杂的View进行动画操作时，因为要进行很多的画 操作，所以并不可能总是能达到60帧每秒。在这种情况下可以通过硬件层来渲染为硬件纹理来提高性能。硬件纹理操作可以用作对一个view进行动画操作，当进行动画的时候可以减少对View自身频繁的重绘。
+
+LAYER_TYPE_NONE: 这个View将被按普通的方式进行渲染，但是不会返回一个离屏的缓冲，这个是默认的行为。
+LAYER_TYPE_HARDWARE:如果这个应用被硬件加速的话，这个View将会在硬件中渲染为硬件纹理，如果应用程序并没有被硬件加速，则其效果和LAYER_TYPE_SOFTWARE是相同的。
+LAYER_TYPE_SOFTWARE: 此View 通过软件渲染为一个bitmap。
+
+
+	2）928730 -- 被Refuse
+	前次修改未找到问题的真正原因，由同事对DeletDropTarget的横屏情况进行了判断，将其设置为setText("");
+
 	疑难：
 	–---------------------------------------------------------------------------
   ==================================== 
-  周二：20150212
+  周六：20150228
+	任务：
+	–---------------------------------------------------------------------------
+	PR：928184：从gallery进入camera，拍摄照片，连续点击返回键盘，推到主屏，屏幕卡住
+
+02-09 15:45:13.214 I/Choreographer( 4801): Skipped 30 frames!  The application may be doing too much work on its main thread.
+
+02-09 15:49:58.370 I/Adreno-EGL( 4801): <qeglDrvAPI_eglInitialize:379>: EGL 1.4 QUALCOMM build:  ()
+02-09 15:49:58.370 I/Adreno-EGL( 4801): OpenGL ES Shader Compiler Version: E031.25.03.01
+02-09 15:49:58.370 I/Adreno-EGL( 4801): Build Date: 01/19/15 Mon
+02-09 15:49:58.370 I/Adreno-EGL( 4801): Local Branch: 
+02-09 15:49:58.370 I/Adreno-EGL( 4801): Remote Branch: 
+02-09 15:49:58.370 I/Adreno-EGL( 4801): Local Patches: 
+02-09 15:49:58.370 I/Adreno-EGL( 4801): Reconstruct Branch: 
+02-09 15:49:58.371 I/OpenGLRenderer( 4801): Initialized EGL, version 1.4
+02-09 15:49:58.508 I/Timeline( 4801): Timeline: Activity_idle id: android.os.BinderProxy@74a06a3 time:20651733
+
+02-09 15:49:58.988 W/OpenGLRenderer( 4801): Incorrectly called buildLayer on View: ShortcutAndWidgetContainer, destroying layer...
+
+02-09 15:51:25.235 I/Timeline( 4801): Timeline: Activity_idle id: android.os.BinderProxy@74a06a3 time:20738460
+	
+02-09 15:51:26.007 W/Launcher( 4801): setApplicationContext called twice!
+        old=com.android.launcher3.LauncherApplication@19f46b0a new=com.android.launcher3.LauncherApplication@19f46b0a
+02-09 15:51:26.112 D/Launcher( 4801): 11683562 - bindAddScreens()
+02-09 15:51:26.112 D/Launcher( 4801): 11683562 -   orderedScreenIds: 1, 2, 3
+02-09 15:51:26.112 D/Launcher.Workspace( 4801): 11683562 - insertNewWorkspaceScreen(): 1 at index: 0
+02-09 15:51:26.114 D/Launcher.Workspace( 4801): 11683562 - insertNewWorkspaceScreen(): 2 at index: 1
+02-09 15:51:26.116 D/Launcher.Workspace( 4801): 11683562 - insertNewWorkspaceScreen(): 3 at index: 2
+	
+	
+
+Launcher.onCreate()
+Launcher.startLoader();
+LauncherModel.LoaderTask.run()
+loadAndBindWorkspace()
+bindWorkspace()
+bindWorkspaceScreens()
+callbacks.bindScreens(orderedScreens) --> Launcher.bindScreen()
+Launcher.bindAddScreens(orderedScreenIds);
+Launcher.addDumpLog(TAG, "11683562 - bindAddScreens()", true);
+
+
+
+02-09 15:49:58.988 W/OpenGLRenderer( 4801): Incorrectly called buildLayer on View: ShortcutAndWidgetContainer, destroying layer...
+
+CanvasContext.cpp -->
+    static void destroyPrefetechedNode(RenderNode* node) {
+        ALOGW("Incorrectly called buildLayer on View: %s, destroying layer...", node->getName());
+        ...
+    }
+
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周一：20150302
+	任务：
+	–---------------------------------------------------------------------------	    
+   	930714：定制屏幕，第一屏要为空屏
+   	设置默认主屏：def_JrdLauncher_homescreen_position
+   	
+   	LauncherModel.loadWorkspace()
+   	LauncherProvider.loadDefaultFavoritesIfNecessary()
+   	
+   	DefaultWorkSpace.loadFavorites()
+
+launcher的数据加载方式
+1、从xml到数据库
+Launcher.onCreate()
+Launcher.startLoader()
+
+2、数据库如何设计的
+
+
+
+
+
+
+
+
+
+	疑难：
+	–---------------------------------------------------------------------------
+  ==================================== 
+  周二：20150303
 	任务：
 	–---------------------------------------------------------------------------		
 	
 	疑难：
 	–---------------------------------------------------------------------------
   ==================================== 
-  周三：20150213
+  周三：20150304
 	任务：
 	–---------------------------------------------------------------------------			
 
@@ -6231,14 +6403,16 @@ PhoneStatusBar {
 	疑难：
 	–---------------------------------------------------------------------------
   ==================================== 
-  周四：20150214
+  周四：20150305
 	任务：
 	–---------------------------------------------------------------------------
 	
 	疑难：
 	–---------------------------------------------------------------------------
   ==================================== 
-  周五：20150215
+  周五：20150306
 	任务：
 	–---------------------------------------------------------------------------
+	
+
 	

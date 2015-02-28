@@ -1,0 +1,126 @@
+Java中标签的使用
+
+下面是对这个用法的总结：
+(1) 简单的一个continue会退回最内层循环的开头（顶部），并继续执行。
+(2) 带有标签的continue会到达标签的位置，并重新进入紧接在那个标签后面的循环
+(3) break会中断当前循环，并移离当前标签的末尾。
+(4) 带标签的break会中断当前循环，并移离由那个标签指示的循环的末尾。
+
+很多程序设计语言中有goto语句，goto语句的使用，使的程序变得难以读懂，尽管goto仍是Java的一个保留字，但并未在语言中得到正式使用；Java没有goto。
+然而，在break和continue这两个关键字的身上，我们仍然能看出一些goto的影子。它并不属于一次跳转，而是中断循环语句的一种方法。之所以把它们纳入goto问题中一起讨论，是由于它们使用了相同的机制：标签。
+
+下面是一个例子，介绍一下这种标签在java中的使用。 
+System.out.println("label1");
+       int i = 0;
+       label1: for (int k = 0; k < 5; k++) {
+           i++;
+           if (k == 2) {
+              break label1;
+           }
+           System.out.println(i);
+       ｝
+输出结果是：
+label1
+    1
+    2
+这说明当k=2时，执行了break语句，跳转到了label1标签处，但是并没有在进入这个for语句块。
+       
+System.out.println("label2");
+       int j = 0;
+       label2: for (int k = 0; k < 5; k++) {
+           j++;
+           if (k == 2) {
+              continue label2;
+           }
+           System.out.println(j);
+       ｝
+输出结果是：
+    label2
+    1
+    2
+    4
+    5
+这说明当k=2时，执行了continue语句，跳出了循环没有执行println语句，然后从label2标签的地方再次进入for语句块。
+上面这两种情况的结果与不使用标签的，只使用break和continue的情况是相同的。因而体现不出标签的作用。
+ 
+System.out.println("label3");
+       int h = 0;
+       label3: for (int k = 0; k < 5; k++) {
+           System.out.println("label3 第一层");
+           for (int m = 0; m < 5; m++) {
+              System.out.println("label3 第二层");
+              h++;
+              if (m == 2) {
+                  break label3;
+              }
+              System.out.println(h);
+           }
+       }
+输出结果是：
+    label3
+    label3 第一层
+    label3 第二层
+    1
+    label3 第二层
+    2
+    label3 第二层
+这说明当k=m时，执行了break语句，跳转到了label3标签处，但是并没有在进入这个for语句块。跳出当前所有的循环
+
+System.out.println("label4");
+       int l = 0;
+       label4: for (int k = 0; k < 5; k++) {
+           System.out.println("label4 第一层");
+           for (int m = 0; m < 5; m++) {
+              System.out.println("label4 第二层");
+              l++;
+              if (m == 2) {
+                  continue label4;
+              }
+              System.out.println(l);
+           }
+       }
+输出结果是：
+label4
+label4 第一层
+label4 第二层
+1
+label4 第二层
+2
+label4 第二层
+label4 第一层
+label4 第二层
+4
+label4 第二层
+5
+label4 第二层
+label4 第一层
+label4 第二层
+7
+label4 第二层
+8
+label4 第二层
+label4 第一层
+label4 第二层
+10
+label4 第二层
+11
+label4 第二层
+label4 第一层
+label4 第二层
+13
+label4 第二层
+14
+label4 第二层
+这说明当m=2时，执行了continue语句，跳出了循环没有执行println语句，然后从label3标签的地方再次进入for语句块。
+当有多从循环的时候，程序只想跳出内层循环，而不跳出外层循环的时候就可以使用这样的break和continue标签了。这种嵌套循环也是适合while语句的。
+当然你也可以写出这样的代码
+    label5:{
+           int b=0;
+           if(tag){
+              break label5;
+             
+           }
+           ......
+       }
+用以跳过下面省略了的代码，当然这样的写法完全可以使用if else代替。
+
